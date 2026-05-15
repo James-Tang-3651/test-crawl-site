@@ -1,0 +1,13 @@
+[build]
+  command = "python scripts/export_static.py"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+  PYTHON_VERSION = "3.10"
+
+[functions]
+  directory = "netlify/functions"
+
+[build.processing.html]
+  pretty_urls = false
