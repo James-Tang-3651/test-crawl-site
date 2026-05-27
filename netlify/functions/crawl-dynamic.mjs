@@ -276,7 +276,6 @@ async function vancouverDailyWeatherReport() {
       <img id="weather-image" src="${escapeHtml(weather.image.src)}" alt="${escapeHtml(weather.image.alt)}" width="240" height="160" />
       <p>This daily weather report updates by Vancouver local date at 00:00 America/Vancouver.</p>
       <p id="weather-source-sentence">${escapeHtml(weather.source_sentence)}</p>
-      <a href="/sitemap.xml">Sitemap with daily change frequency</a>
     </article>
     <script>
       const weatherCitySelect = document.querySelector("#weather-city");

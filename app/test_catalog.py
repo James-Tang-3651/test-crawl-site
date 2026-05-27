@@ -497,6 +497,23 @@ TEST_SECTIONS: List[Dict[str, Any]] = [
                 "home_links": [{"href": "/status/504", "label": "504 page"}],
             },
             {
+                "path": "/status/504-html-external-link",
+                "crawl_worthy": True,
+                "category": "status_page",
+                "expected_status": 504,
+                "label": "504 page with HTML body linking to a nowhere page",
+                "home_links": [
+                    {"href": "/status/504-html-external-link", "label": "504 HTML body with link to nowhere"}
+                ],
+            },
+            {
+                "path": "/error-link-to-nowhere",
+                "crawl_worthy": True,
+                "category": "status_page",
+                "label": "Link-to-nowhere landing page (reached only from 504 HTML body)",
+                "home_links": [],
+            },
+            {
                 "path": "/wrong-content-type-html-as-text",
                 "crawl_worthy": True,
                 "category": "wrong_content_type",

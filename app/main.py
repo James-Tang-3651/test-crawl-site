@@ -326,7 +326,6 @@ def vancouver_daily_weather_body() -> str:
       <img id="weather-image" src="{escape(weather["image"]["src"], quote=True)}" alt="{escape(weather["image"]["alt"], quote=True)}" width="240" height="160" />
       <p>This daily weather report updates by Vancouver local date at 00:00 America/Vancouver.</p>
       <p id="weather-source-sentence">{escape(weather["source_sentence"])}</p>
-      <a href="/sitemap.xml">Sitemap with daily change frequency</a>
     </article>
     """
 
@@ -2920,14 +2919,9 @@ async def redirect_loop_a():
     return RedirectResponse("/redirect-loop-b", status_code=302)
 
 
-@app.get("/redirect-loop-b", response_class=HTMLResponse)
+@app.get("/redirect-loop-b")
 async def redirect_loop_b():
-    body = """
-    <p>Redirect loop B is a valid renderable page reached after /redirect-loop-a redirects here.</p>
-    <p>This page includes body content so browser-based checks can confirm the redirect target loaded.</p>
-    <a href="/about?from=redirect-loop-b">About child from redirect loop B</a>
-    """
-    return html_page("Redirect Loop B", body)
+    return RedirectResponse("/redirect-loop-a", status_code=302)
 
 
 @app.get("/depth/0", response_class=HTMLResponse)
@@ -3268,6 +3262,36 @@ async def status_500():
 @app.get("/status/504")
 async def status_504():
     return PlainTextResponse("Gateway timeout test page", status_code=504, headers={"Retry-After": "3"})
+
+
+@app.get("/status/504-html-external-link")
+async def status_504_html_external_link():
+    body = """
+    <h1>504 Gateway Timeout</h1>
+    <p>The upstream server did not respond in time. This error page is intentionally
+       served as <code>text/html</code> with a non-empty body so that crawler behaviour
+       on HTML-bodied error responses can be exercised.</p>
+    <p>For more information, follow this
+       <a href="/error-link-to-nowhere">helpful reference link</a>.</p>
+    <p>You can also <a href="/about">return to the About page</a> while the upstream recovers.</p>
+    """
+    return HTMLResponse(
+        content=html_document("Gateway Timeout (HTML body with link to nowhere)", body),
+        status_code=504,
+        headers={"Retry-After": "3"},
+    )
+
+
+@app.get("/error-link-to-nowhere", response_class=HTMLResponse)
+async def error_link_to_nowhere():
+    body = """
+    <h1>Error link that leads to nowhere</h1>
+    <p>You followed a link from an error page. It led here. There is nothing useful on this page.</p>
+    <p>This page exists so the crawler can confirm that links embedded inside HTML-bodied error
+       responses are (or are not) followed, and to give those followed links a deterministic landing
+       target.</p>
+    """
+    return html_page("Error link that leads to nowhere", body)
 
 
 @app.get("/files/sample.pdf")
