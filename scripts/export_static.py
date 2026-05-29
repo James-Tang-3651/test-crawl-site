@@ -200,7 +200,12 @@ def route_target_path(path: str, headers: dict[str, str]) -> str:
     if path == "/":
         slug = "index"
     else:
-        slug = path.strip("/").replace("/", "__").replace(".", "-") or "index"
+        # Strip query string and fragment so ? and # never appear in the filename.
+        # Netlify rejects filenames containing either character.
+        # The full path (with query/fragment) is still used for the hash so every
+        # distinct URL gets its own unique file even when paths share a base.
+        clean_path = path.split("?")[0].split("#")[0]
+        slug = clean_path.strip("/").replace("/", "__").replace(".", "-") or "index"
     slug = slug[:30].rstrip("-_")
     digest = hashlib.sha1(path.encode("utf-8")).hexdigest()[:8]
     return f"/__routes/{slug}-{digest}{extension_for(headers)}"

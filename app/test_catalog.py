@@ -151,6 +151,83 @@ TEST_SECTIONS: List[Dict[str, Any]] = [
         ],
     },
     {
+        "id": "hash-navigation",
+        "title": "Hash Navigation",
+        "entries": [
+            {
+                "path": "/hash-anchors",
+                "crawl_worthy": True,
+                "category": "hash_anchor_navigation",
+                "label": "Hash anchor sections page",
+                "home_links": [
+                    {"href": "/hash-anchors", "label": "Hash anchor sections page"},
+                    {"href": "/hash-anchors#section-a", "label": "Hash anchor - Section A"},
+                    {"href": "/hash-anchors#section-b", "label": "Hash anchor - Section B"},
+                    {"href": "/hash-anchors#section-c", "label": "Hash anchor - Section C"},
+                ],
+            },
+            {
+                "path": "/hash-router",
+                "crawl_worthy": True,
+                "category": "hash_spa_routing",
+                "label": "Hash router (SPA-style) page",
+                "home_links": [
+                    {"href": "/hash-router", "label": "Hash router (SPA-style) page"},
+                    {"href": "/hash-router#overview", "label": "Hash router - Overview"},
+                    {"href": "/hash-router#specs", "label": "Hash router - Specs"},
+                    {"href": "/hash-router#reviews", "label": "Hash router - Reviews"},
+                ],
+            },
+            {
+                "path": "/hash-path-router",
+                "crawl_worthy": True,
+                "category": "hash_path_routing",
+                "label": "Hash-path router (Angular / Vue hash mode style) page",
+                "home_links": [
+                    {"href": "/hash-path-router", "label": "Hash-path router page"},
+                    {"href": "/hash-path-router#/", "label": "Hash-path router - Home route"},
+                    {"href": "/hash-path-router#/about", "label": "Hash-path router - About"},
+                    {"href": "/hash-path-router#/products", "label": "Hash-path router - Products"},
+                    {"href": "/hash-path-router#/products/detail", "label": "Hash-path router - Product detail"},
+                ],
+            },
+            {
+                "path": "/hash-query-combo",
+                "crawl_worthy": True,
+                "category": "hash_query_combo",
+                "label": "Query string + hash fragment combo page",
+                "home_links": [
+                    {"href": "/hash-query-combo", "label": "Query string + hash fragment combo page"},
+                    {"href": "/hash-query-combo?q=test#results", "label": "Hash query combo - q=test"},
+                    {"href": "/hash-query-combo?q=other#results", "label": "Hash query combo - q=other"},
+                ],
+            },
+            {
+                "path": "/hashbang-router",
+                "crawl_worthy": True,
+                "category": "hashbang_routing",
+                "label": "Hashbang router (#! pattern) page",
+                "home_links": [
+                    {"href": "/hashbang-router", "label": "Hashbang router page"},
+                    {"href": "/hashbang-router#!/home", "label": "Hashbang router - Home"},
+                    {"href": "/hashbang-router#!/about", "label": "Hashbang router - About"},
+                    {"href": "/hashbang-router#!/contact", "label": "Hashbang router - Contact"},
+                ],
+            },
+            {
+                "path": "/percent-encoded-hash",
+                "crawl_worthy": True,
+                "category": "percent_encoded_hash",
+                "label": "Percent-encoded hash (%23) vs fragment (#) page",
+                "home_links": [
+                    {"href": "/percent-encoded-hash", "label": "Percent-encoded hash demo page"},
+                    {"href": "/percent-encoded-hash#real-anchor", "label": "Percent-encoded hash - real fragment"},
+                    {"href": "/percent-encoded-hash%23real-anchor", "label": "Percent-encoded hash - %23 in path (expect 404)"},
+                ],
+            },
+        ],
+    },
+    {
         "id": "redirects",
         "title": "Redirects",
         "entries": [
@@ -767,6 +844,14 @@ TEST_SECTIONS: List[Dict[str, Any]] = [
                 "home_links": [{"href": "/product-pages/separate-pages", "label": "Product variants - Separate pages"}],
             },
             {
+                "path": "/product-pages/query-params",
+                "crawl_worthy": True,
+                "category": "product_variant_pages",
+                "product_variant_strategy": "query_params",
+                "label": "Product variants - Query params",
+                "home_links": [{"href": "/product-pages/query-params", "label": "Product variants - Query params"}],
+            },
+            {
                 "path": "/product-pages/javascript-calculated",
                 "crawl_worthy": True,
                 "category": "product_variant_javascript_calculated",
@@ -935,12 +1020,27 @@ def _product_variant_entries() -> Iterator[Dict[str, Any]]:
         }
 
 
+def _product_variant_qp_entries() -> Iterator[Dict[str, Any]]:
+    for variant in iter_product_variants():
+        yield {
+            "path": f"/product-pages/query-params?color={variant['color_slug']}&size={variant['size_slug']}",
+            "crawl_worthy": True,
+            "category": "product_variant_page",
+            "product_variant_strategy": "query_params",
+            "color": variant["color_name"],
+            "size": variant["size_name"],
+            "sku": variant["sku"],
+            "label": f"Product variant query param page: {variant['color_name']} / {variant['size_name']}",
+        }
+
+
 def _add_generated_entries() -> None:
     for section in TEST_SECTIONS:
         if section["id"] == "scale-graph":
             section["entries"].extend(_scale_graph_entries())
         if section["id"] == "product-pages":
             section["entries"].extend(_product_variant_entries())
+            section["entries"].extend(_product_variant_qp_entries())
 
 
 def _build_page_manifest() -> List[Dict[str, Any]]:

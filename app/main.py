@@ -843,6 +843,48 @@ def product_variant_matrix() -> str:
     return "".join(rows)
 
 
+def product_query_params_path(color_slug: str, size_slug: str) -> str:
+    return f"/product-pages/query-params?color={color_slug}&size={size_slug}"
+
+
+def product_color_links_qp(selected_color: str, selected_size: str) -> str:
+    links = []
+    for color_slug, color in PRODUCT_COLORS.items():
+        current = ' aria-current="page"' if color_slug == selected_color else ""
+        links.append(
+            f'<a href="{product_query_params_path(color_slug, selected_size)}"{current}>'
+            f"{escape(color['name'])}</a>"
+        )
+    return "".join(links)
+
+
+def product_size_links_qp(selected_color: str, selected_size: str) -> str:
+    links = []
+    for size_slug, size in PRODUCT_SIZES.items():
+        current = ' aria-current="page"' if size_slug == selected_size else ""
+        links.append(
+            f'<a href="{product_query_params_path(selected_color, size_slug)}"{current}>'
+            f"{escape(size['name'])}</a>"
+        )
+    return "".join(links)
+
+
+def product_variant_matrix_qp() -> str:
+    rows = []
+    for variant in iter_product_variants():
+        href = product_query_params_path(variant["color_slug"], variant["size_slug"])
+        rows.append(
+            f"""
+        <tr>
+          <td><a href="{href}">{escape(variant['color_name'])} / {escape(variant['size_name'])}</a></td>
+          <td>{escape(variant['sku'])}</td>
+          <td>{escape(variant['price'])}</td>
+          <td>{escape(variant['stock_status'])}</td>
+        </tr>"""
+        )
+    return "".join(rows)
+
+
 def product_feature_items(variant: dict) -> str:
     return "".join(f"<li>{escape(feature)}</li>" for feature in variant["feature_bullets"])
 
@@ -1449,6 +1491,59 @@ async def product_separate_pages_variant(color_slug: str, size_slug: str):
     if color_slug not in PRODUCT_COLORS or size_slug not in PRODUCT_SIZES:
         return PlainTextResponse("Unknown product variant", status_code=404)
     return product_separate_page(color_slug, size_slug)
+
+
+def product_query_params_page(color_slug: str, size_slug: str) -> HTMLResponse:
+    variant = product_variant(color_slug, size_slug)
+    title = f"Product variants - Query params: {variant['color_name']} {variant['size_name']}"
+    body = f"""
+    <nav class="product-breadcrumbs" aria-label="Breadcrumb">
+      <a href="/">Home</a>
+      <span>/</span>
+      <a href="/product-pages/query-params">Product Pages (Query Params)</a>
+      <span>/</span>
+      <span>{escape(variant['color_name'])} {escape(variant['size_name'])}</span>
+    </nav>
+    <article class="product-grid">
+      <section class="product-visual" style="--swatch: {escape(variant['swatch'], quote=True)}">
+        <strong>{escape(variant['visual_label'])}</strong>
+      </section>
+      <section>
+        <p>{escape(PRODUCT_BRAND)}</p>
+        <h2>{escape(PRODUCT_NAME)}</h2>
+        <p>{escape(PRODUCT_RATING)} stars from {escape(PRODUCT_REVIEW_COUNT)} reviews</p>
+        <p class="product-price">{escape(variant['price'])}</p>
+        <p><strong>Selected:</strong> {escape(variant['color_name'])} / {escape(variant['size_name'])}</p>
+        <p><strong>SKU:</strong> {escape(variant['sku'])}</p>
+        <p><strong>Availability:</strong> {escape(variant['stock_status'])} ({variant['stock_quantity']} units)</p>
+        <p><strong>Shipping:</strong> {escape(variant['shipping_message'])}</p>
+        <h3>Color</h3>
+        <div class="variant-options">{product_color_links_qp(color_slug, size_slug)}</div>
+        <h3>Size</h3>
+        <div class="variant-options">{product_size_links_qp(color_slug, size_slug)}</div>
+      </section>
+    </article>
+    {product_common_sections(variant)}
+    <section class="product-section">
+      <h2>All Query Param Variant URLs</h2>
+      <table class="variant-matrix">
+        <thead>
+          <tr><th>Variant page</th><th>SKU</th><th>Price</th><th>Stock</th></tr>
+        </thead>
+        <tbody>
+          {product_variant_matrix_qp()}
+        </tbody>
+      </table>
+    </section>
+    """
+    return html_page(title, body, head=product_page_head())
+
+
+@app.get("/product-pages/query-params", response_class=HTMLResponse)
+async def product_query_params_variant(color: str = PRODUCT_DEFAULT_COLOR, size: str = PRODUCT_DEFAULT_SIZE):
+    if color not in PRODUCT_COLORS or size not in PRODUCT_SIZES:
+        return PlainTextResponse("Unknown product variant", status_code=404)
+    return product_query_params_page(color, size)
 
 
 @app.get("/product-pages/javascript-calculated", response_class=HTMLResponse)
@@ -3292,6 +3387,207 @@ async def error_link_to_nowhere():
        target.</p>
     """
     return html_page("Error link that leads to nowhere", body)
+
+
+@app.get("/hash-anchors", response_class=HTMLResponse)
+async def hash_anchors():
+    body = """
+    <p>This page uses traditional anchor-based hash navigation. All three sections are always
+       present in the HTML — the hash only controls scroll position, not what is rendered.
+       A crawler should treat <code>/hash-anchors</code>, <code>/hash-anchors#section-a</code>,
+       and <code>/hash-anchors#section-b</code> as the same page.</p>
+    <nav>
+      <a href="#section-a">Section A</a>
+      <a href="#section-b">Section B</a>
+      <a href="#section-c">Section C</a>
+    </nav>
+    <section id="section-a">
+      <h2>Section A</h2>
+      <p>Content for section A. This is a traditional anchor link target — always rendered in the HTML.</p>
+      <a href="#section-b">Jump to Section B</a>
+    </section>
+    <section id="section-b">
+      <h2>Section B</h2>
+      <p>Content for section B. The hash controls scroll position only, not what is rendered on the server.</p>
+      <a href="#section-c">Jump to Section C</a>
+    </section>
+    <section id="section-c">
+      <h2>Section C</h2>
+      <p>Content for section C. All three sections exist in the DOM regardless of the current hash.</p>
+      <a href="#section-a">Back to Section A</a>
+    </section>
+    """
+    return html_page("Hash anchor sections", body)
+
+
+@app.get("/hash-router", response_class=HTMLResponse)
+async def hash_router():
+    body = """
+    <p>This page uses hash-based SPA routing. Only one section is visible at a time — JavaScript
+       reads <code>window.location.hash</code> and renders matching content into the page.
+       A crawler would need to follow each hash link and execute the JavaScript to see the content
+       for <code>#overview</code>, <code>#specs</code>, and <code>#reviews</code>.</p>
+    <nav>
+      <a href="#overview">Overview</a>
+      <a href="#specs">Specs</a>
+      <a href="#reviews">Reviews</a>
+    </nav>
+    <div id="hash-content">
+      <p><em>Loading route...</em></p>
+    </div>
+    """
+    script = """
+<script>
+  const routes = {
+    "overview": "<h2>Overview</h2><p>This is the overview section. It is only in the DOM when the hash is <code>#overview</code> or absent.</p><p><a href='/about'>About page</a></p>",
+    "specs":    "<h2>Specs</h2><p>This is the specs section. A crawler that does not execute JavaScript will never see this content.</p>",
+    "reviews":  "<h2>Reviews</h2><p>This is the reviews section. Each hash route is a separate content state on a single URL path.</p>",
+  };
+
+  function renderRoute() {
+    const hash = window.location.hash.slice(1) || "overview";
+    document.getElementById("hash-content").innerHTML =
+      routes[hash] || "<p>Unknown route: <code>" + hash + "</code>.</p>";
+  }
+
+  window.addEventListener("hashchange", renderRoute);
+  renderRoute();
+</script>"""
+    return html_page("Hash router (SPA-style)", body, script=script)
+
+
+@app.get("/hash-path-router", response_class=HTMLResponse)
+async def hash_path_router():
+    body = """
+    <p>This page uses hash-path routing — the URL hash contains a full routable path
+       (e.g. <code>/hash-path-router#/products/detail</code>). This is the pattern used by
+       Angular, Vue Router in hash mode, and React HashRouter. The server always returns the
+       same HTML regardless of the hash; all routing is handled client-side by JavaScript
+       reading <code>window.location.hash</code>.</p>
+    <nav>
+      <a href="#/">Home</a>
+      <a href="#/about">About</a>
+      <a href="#/products">Products</a>
+      <a href="#/products/detail">Product detail</a>
+    </nav>
+    <div id="hash-path-content">
+      <p><em>Loading...</em></p>
+    </div>
+    """
+    script = """
+<script>
+  const routes = {
+    "/":                "<h2>Home</h2><p>Hash-path router home. The full URL is <code>/hash-path-router#/</code>.</p>",
+    "/about":           "<h2>About</h2><p>Hash-path router about page. Full URL: <code>/hash-path-router#/about</code>. This content only exists in the DOM after JavaScript runs.</p>",
+    "/products":        "<h2>Products</h2><p>Hash-path router products list. Full URL: <code>/hash-path-router#/products</code>.</p><p><a href='#/products/detail'>View product detail</a></p>",
+    "/products/detail": "<h2>Product detail</h2><p>Hash-path router nested route. Full URL: <code>/hash-path-router#/products/detail</code>. This is two levels deep inside the hash path.</p>",
+  };
+
+  function renderRoute() {
+    const hashPath = window.location.hash.replace(/^#/, "") || "/";
+    document.getElementById("hash-path-content").innerHTML =
+      routes[hashPath] || "<p>Unknown hash route: <code>" + hashPath + "</code>.</p>";
+  }
+
+  window.addEventListener("hashchange", renderRoute);
+  renderRoute();
+</script>"""
+    return html_page("Hash-path router (Angular / Vue hash mode style)", body, script=script)
+
+
+@app.get("/hash-query-combo", response_class=HTMLResponse)
+async def hash_query_combo(q: str = ""):
+    query_display = escape(q) if q else "<em>No query entered.</em>"
+    body = f"""
+    <p>This page combines a query string with a hash fragment. The full URL looks like
+       <code>/hash-query-combo?q=test#results</code>. The <code>?q=</code> parameter is
+       processed server-side; the <code>#results</code> fragment scrolls the page to the
+       results section. A crawler must parse <code>?</code> before <code>#</code> to correctly
+       extract the query parameters — if it treats everything after <code>#</code> as the
+       fragment, it will miss <code>?q=test</code>; if it treats <code>#results</code> as part
+       of the query string, it will send a malformed request.</p>
+    <form action="/hash-query-combo" method="get">
+      <input name="q" value="{escape(q, quote=True)}" placeholder="Enter a search query" />
+      <button type="submit">Search</button>
+    </form>
+    <section id="results">
+      <h2>Results</h2>
+      <p>Query: {query_display}</p>
+    </section>
+    """
+    return html_page("Query string + hash fragment combo", body)
+
+
+@app.get("/hashbang-router", response_class=HTMLResponse)
+async def hashbang_router():
+    body = """
+    <p>This page uses the <code>#!</code> hashbang pattern. This was the mechanism Google
+       recommended (2009–2015) for making AJAX-rendered content crawlable: when Googlebot
+       encountered <code>#!/route</code> it would instead fetch
+       <code>?_escaped_fragment_=/route</code> from the server. Some crawlers still recognise
+       <code>#!</code> as a special signal; others treat it like any other hash fragment.</p>
+    <nav>
+      <a href="#!/home">Home</a>
+      <a href="#!/about">About</a>
+      <a href="#!/contact">Contact</a>
+    </nav>
+    <div id="hashbang-content">
+      <p><em>Loading...</em></p>
+    </div>
+    """
+    script = """
+<script>
+  const routes = {
+    "home":    "<h2>Home</h2><p>Hashbang home route. Full URL: <code>/hashbang-router#!/home</code>. A crawler that rewrites <code>#!</code> to <code>?_escaped_fragment_=</code> would request <code>/hashbang-router?_escaped_fragment_=home</code> instead.</p>",
+    "about":   "<h2>About</h2><p>Hashbang about route. Full URL: <code>/hashbang-router#!/about</code>. Content is only visible after JavaScript executes.</p>",
+    "contact": "<h2>Contact</h2><p>Hashbang contact route. Full URL: <code>/hashbang-router#!/contact</code>.</p>",
+  };
+
+  function renderRoute() {
+    const hash = window.location.hash;
+    const route = hash.startsWith("#!") ? hash.slice(2) : "home";
+    document.getElementById("hashbang-content").innerHTML =
+      routes[route] || "<p>Unknown route: <code>" + route + "</code>.</p>";
+  }
+
+  window.addEventListener("hashchange", renderRoute);
+  renderRoute();
+</script>"""
+    return html_page("Hashbang router (#! pattern)", body, script=script)
+
+
+@app.get("/percent-encoded-hash", response_class=HTMLResponse)
+async def percent_encoded_hash():
+    body = """
+    <p>This page demonstrates the difference between <code>#</code> (a fragment delimiter, never
+       sent to the server) and <code>%23</code> (a percent-encoded literal hash character that
+       <em>is</em> part of the path or query string sent to the server). They look similar in a
+       URL but are entirely different things.</p>
+    <ul>
+      <li>
+        <a href="#real-anchor">Fragment link: <code>#real-anchor</code></a> —
+        browser scrolls to the section below; server only sees a request for
+        <code>/percent-encoded-hash</code>.
+      </li>
+      <li>
+        <a href="/percent-encoded-hash%23real-anchor">Encoded-hash link: <code>/percent-encoded-hash%23real-anchor</code></a> —
+        server receives a request for the path <code>/percent-encoded-hash%23real-anchor</code>
+        (a different URL entirely), which returns 404. A crawler that strips <code>%23</code>
+        as if it were a fragment delimiter would incorrectly record a 200 instead.
+      </li>
+      <li>
+        <a href="/query-page?ref=%23section">Query param with <code>%23</code>: <code>/query-page?ref=%23section</code></a> —
+        the <code>%23</code> decodes to a literal <code>#</code> in the query value, not a fragment.
+        The server receives <code>ref=#section</code> as a query parameter.
+      </li>
+    </ul>
+    <section id="real-anchor">
+      <h2>Real anchor section</h2>
+      <p>Reachable via the fragment <code>#real-anchor</code>. Always present in the HTML —
+         the hash only scrolls here and is never sent to the server.</p>
+    </section>
+    """
+    return html_page("Percent-encoded hash (%23) vs fragment (#)", body)
 
 
 @app.get("/files/sample.pdf")
