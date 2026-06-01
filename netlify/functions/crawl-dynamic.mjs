@@ -308,6 +308,137 @@ async function vancouverDailyWeatherReportData(url) {
   });
 }
 
+const vancouverLatitude = 49.2827;
+const vancouverLongitude = -123.1207;
+const forecastApiUrl =
+  `https://api.open-meteo.com/v1/forecast?latitude=${vancouverLatitude}&longitude=${vancouverLongitude}` +
+  "&daily=weathercode,temperature_2m_max,temperature_2m_min&timezone=America%2FVancouver&forecast_days=7";
+const forecastSourceSentence = "Weather source: Open-Meteo / open-meteo.com.";
+
+// WMO weather interpretation codes returned by Open-Meteo's "weathercode" field.
+const wmoWeatherSummaries = {
+  0: "Clear sky",
+  1: "Mainly clear",
+  2: "Partly cloudy",
+  3: "Overcast",
+  45: "Fog",
+  48: "Depositing rime fog",
+  51: "Light drizzle",
+  53: "Moderate drizzle",
+  55: "Dense drizzle",
+  56: "Light freezing drizzle",
+  57: "Dense freezing drizzle",
+  61: "Slight rain",
+  63: "Moderate rain",
+  65: "Heavy rain",
+  66: "Light freezing rain",
+  67: "Heavy freezing rain",
+  71: "Slight snow",
+  73: "Moderate snow",
+  75: "Heavy snow",
+  77: "Snow grains",
+  80: "Slight rain showers",
+  81: "Moderate rain showers",
+  82: "Violent rain showers",
+  85: "Slight snow showers",
+  86: "Heavy snow showers",
+  95: "Thunderstorm",
+  96: "Thunderstorm with slight hail",
+  99: "Thunderstorm with heavy hail",
+};
+
+function wmoSummary(code) {
+  return wmoWeatherSummaries[code] ?? "unavailable";
+}
+
+function formatForecastTemp(value) {
+  return typeof value === "number" ? `${Math.round(value)}°C` : "unavailable";
+}
+
+function formatForecastDay(iso) {
+  const names = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const [year, month, day] = String(iso).split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  const mm = String(month).padStart(2, "0");
+  const dd = String(day).padStart(2, "0");
+  return {name: names[date.getUTCDay()], date: `${mm}/${dd}/${year}`};
+}
+
+async function fetchVancouverForecast() {
+  try {
+    const response = await fetch(forecastApiUrl, {
+      headers: {"user-agent": "crawl-test-site/1.0"},
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!response.ok) {
+      return [];
+    }
+    const data = await response.json();
+    const daily = data.daily || {};
+    const times = daily.time || [];
+    const codes = daily.weathercode || [];
+    const highs = daily.temperature_2m_max || [];
+    const lows = daily.temperature_2m_min || [];
+    return times.map((iso, index) => {
+      const {name, date} = formatForecastDay(iso);
+      return {
+        name,
+        date,
+        summary: wmoSummary(codes[index]),
+        high: formatForecastTemp(highs[index]),
+        low: formatForecastTemp(lows[index]),
+      };
+    });
+  } catch {
+    return [];
+  }
+}
+
+async function vancouverWeeklyWeatherReport() {
+  const location = weatherLocations[defaultWeatherCity];
+  const forecast = await fetchVancouverForecast();
+
+  if (forecast.length === 0) {
+    const body = `
+    <article>
+      <p id="weather-week-range">Weekly weather forecast for ${escapeHtml(location.sentenceName)} is unavailable right now.</p>
+      <p id="weather-source-sentence">${escapeHtml(forecastSourceSentence)}</p>
+    </article>
+    `;
+    return htmlResponse("Vancouver weekly weather report", body);
+  }
+
+  const weekStart = forecast[0].date;
+  const weekEnd = forecast[forecast.length - 1].date;
+  const imageKind = weatherImageKind(forecast[0].summary);
+  const imageSrc = weatherImageSrc(imageKind);
+  const rows = forecast
+    .map(
+      (day) =>
+        `<tr><th scope="row">${escapeHtml(day.name)}</th><td>${escapeHtml(day.date)}</td>` +
+        `<td>${escapeHtml(day.summary)}</td><td>${escapeHtml(day.high)}</td><td>${escapeHtml(day.low)}</td></tr>`,
+    )
+    .join("");
+  const body = `
+    <article>
+      <p id="weather-week-range">Weekly weather forecast for ${escapeHtml(location.sentenceName)}, ${escapeHtml(weekStart)} to ${escapeHtml(weekEnd)}.</p>
+      <img id="weather-image" src="${escapeHtml(imageSrc)}" alt="Generic ${escapeHtml(imageKind)} weather image" width="240" height="160" />
+      <table class="weekly-weather">
+        <thead>
+          <tr><th scope="col">Day</th><th scope="col">Date</th><th scope="col">Outlook</th><th scope="col">High</th><th scope="col">Low</th></tr>
+        </thead>
+        <tbody>
+          ${rows}
+        </tbody>
+      </table>
+      <p>This weekly weather forecast updates by Vancouver local date each Monday at 00:00 America/Vancouver.</p>
+      <p id="weather-source-sentence">${escapeHtml(forecastSourceSentence)}</p>
+    </article>
+    `;
+
+  return htmlResponse("Vancouver weekly weather report", body);
+}
+
 export default async function handler(request) {
   const url = new URL(request.url);
 
@@ -353,6 +484,10 @@ export default async function handler(request) {
     return vancouverDailyWeatherReportData(url);
   }
 
+  if (url.pathname === "/weather/vancouver-weekly-report") {
+    return vancouverWeeklyWeatherReport();
+  }
+
   return new Response("Not found", {
     status: 404,
     headers: {"content-type": "text/plain; charset=utf-8"},
@@ -370,5 +505,6 @@ export const config = {
     "/status/504",
     "/weather/vancouver-daily-report",
     "/weather/vancouver-daily-report/data.json",
+    "/weather/vancouver-weekly-report",
   ],
 };

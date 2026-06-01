@@ -70,6 +70,7 @@ FUNCTION_PATHS = {
     "/status/504",
     "/weather/vancouver-daily-report",
     "/weather/vancouver-daily-report/data.json",
+    "/weather/vancouver-weekly-report",
 }
 
 CONTENT_TYPE_EXTENSIONS = {

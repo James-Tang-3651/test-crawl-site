@@ -147,6 +147,57 @@ WEATHER_IMAGES = {
     "rainy": """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 160"><rect width="240" height="160" fill="#e3fafc"/><path fill="#868e96" d="M74 92c-19 0-34-13-34-30 0-16 13-29 31-30 9-18 29-30 52-30 31 0 57 22 59 50 15 4 26 17 26 31 0 17-15 30-34 30H74Z"/><g stroke="#228be6" stroke-width="8" stroke-linecap="round"><path d="m76 126-10 20"/><path d="m118 126-10 20"/><path d="m160 126-10 20"/></g></svg>""",
 }
 
+# Open-Meteo provides a free 7-day daily forecast with no API key, used for the
+# weekly weather report. Vancouver, BC coordinates.
+VANCOUVER_LATITUDE = 49.2827
+VANCOUVER_LONGITUDE = -123.1207
+FORECAST_API_URL = (
+    "https://api.open-meteo.com/v1/forecast"
+    f"?latitude={VANCOUVER_LATITUDE}&longitude={VANCOUVER_LONGITUDE}"
+    "&daily=weathercode,temperature_2m_max,temperature_2m_min"
+    "&timezone=America%2FVancouver&forecast_days=7"
+)
+FORECAST_SOURCE_SENTENCE = "Weather source: Open-Meteo / open-meteo.com."
+
+# WMO weather interpretation codes returned by Open-Meteo's "weathercode" field.
+WMO_WEATHER_SUMMARIES = {
+    0: "Clear sky",
+    1: "Mainly clear",
+    2: "Partly cloudy",
+    3: "Overcast",
+    45: "Fog",
+    48: "Depositing rime fog",
+    51: "Light drizzle",
+    53: "Moderate drizzle",
+    55: "Dense drizzle",
+    56: "Light freezing drizzle",
+    57: "Dense freezing drizzle",
+    61: "Slight rain",
+    63: "Moderate rain",
+    65: "Heavy rain",
+    66: "Light freezing rain",
+    67: "Heavy freezing rain",
+    71: "Slight snow",
+    73: "Moderate snow",
+    75: "Heavy snow",
+    77: "Snow grains",
+    80: "Slight rain showers",
+    81: "Moderate rain showers",
+    82: "Violent rain showers",
+    85: "Slight snow showers",
+    86: "Heavy snow showers",
+    95: "Thunderstorm",
+    96: "Thunderstorm with slight hail",
+    99: "Thunderstorm with heavy hail",
+}
+
+
+def wmo_summary(code) -> str:
+    try:
+        return WMO_WEATHER_SUMMARIES.get(int(code), "unavailable")
+    except (TypeError, ValueError):
+        return "unavailable"
+
 
 def html_document(title: str, body: str, head: str = "", script: str = "", lang: str = "") -> str:
     lang_attr = f' lang="{lang}"' if lang else ""
@@ -351,6 +402,82 @@ def vancouver_daily_weather_script() -> str:
 
       weatherCitySelect.addEventListener("change", updateWeatherCity);
     </script>
+    """
+
+
+def _format_forecast_temp(value) -> str:
+    return f"{round(value)}°C" if isinstance(value, (int, float)) else "unavailable"
+
+
+def fetch_vancouver_forecast() -> List[dict]:
+    request = urllib.request.Request(
+        FORECAST_API_URL,
+        headers={"User-Agent": "crawl-test-site/1.0"},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=5) as response:
+            data = json.loads(response.read().decode("utf-8", errors="replace"))
+    except (OSError, urllib.error.URLError, TimeoutError, ValueError):
+        return []
+
+    daily = data.get("daily") or {}
+    times = daily.get("time") or []
+    codes = daily.get("weathercode") or []
+    highs = daily.get("temperature_2m_max") or []
+    lows = daily.get("temperature_2m_min") or []
+
+    days = []
+    for index, day_iso in enumerate(times):
+        try:
+            day_date = datetime.strptime(day_iso, "%Y-%m-%d")
+        except (TypeError, ValueError):
+            continue
+        days.append({
+            "name": day_date.strftime("%A"),
+            "date": day_date.strftime("%m/%d/%Y"),
+            "summary": wmo_summary(codes[index] if index < len(codes) else None),
+            "high": _format_forecast_temp(highs[index] if index < len(highs) else None),
+            "low": _format_forecast_temp(lows[index] if index < len(lows) else None),
+        })
+    return days
+
+
+def vancouver_weekly_weather_body() -> str:
+    location = WEATHER_LOCATIONS[DEFAULT_WEATHER_CITY]
+    forecast = fetch_vancouver_forecast()
+
+    if not forecast:
+        return f"""
+    <article>
+      <p id="weather-week-range">Weekly weather forecast for {escape(location["sentence_name"])} is unavailable right now.</p>
+      <p id="weather-source-sentence">{escape(FORECAST_SOURCE_SENTENCE)}</p>
+    </article>
+    """
+
+    week_start = forecast[0]["date"]
+    week_end = forecast[-1]["date"]
+    image_kind = weather_image_kind(forecast[0]["summary"])
+    image_src = weather_image_src(image_kind)
+    rows = "".join(
+        f'<tr><th scope="row">{escape(day["name"])}</th><td>{escape(day["date"])}</td>'
+        f'<td>{escape(day["summary"])}</td><td>{escape(day["high"])}</td><td>{escape(day["low"])}</td></tr>'
+        for day in forecast
+    )
+    return f"""
+    <article>
+      <p id="weather-week-range">Weekly weather forecast for {escape(location["sentence_name"])}, {escape(week_start)} to {escape(week_end)}.</p>
+      <img id="weather-image" src="{escape(image_src, quote=True)}" alt="Generic {escape(image_kind)} weather image" width="240" height="160" />
+      <table class="weekly-weather">
+        <thead>
+          <tr><th scope="col">Day</th><th scope="col">Date</th><th scope="col">Outlook</th><th scope="col">High</th><th scope="col">Low</th></tr>
+        </thead>
+        <tbody>
+          {rows}
+        </tbody>
+      </table>
+      <p>This weekly weather forecast updates by Vancouver local date each Monday at 00:00 America/Vancouver.</p>
+      <p id="weather-source-sentence">{escape(FORECAST_SOURCE_SENTENCE)}</p>
+    </article>
     """
 
 
@@ -3134,6 +3261,14 @@ async def weather_vancouver_daily_report_data(city: str = DEFAULT_WEATHER_CITY):
     return JSONResponse(weather_payload(city))
 
 
+@app.get("/weather/vancouver-weekly-report", response_class=HTMLResponse)
+async def weather_vancouver_weekly_report():
+    return html_page(
+        "Vancouver weekly weather report",
+        vancouver_weekly_weather_body(),
+    )
+
+
 @app.get("/localhost-link", response_class=HTMLResponse)
 async def localhost_link(request: Request):
     port = request.url.port
@@ -3493,6 +3628,61 @@ async def hash_path_router():
   renderRoute();
 </script>"""
     return html_page("Hash-path router (Angular / Vue hash mode style)", body, script=script)
+
+
+@app.get("/hash-drawer", response_class=HTMLResponse)
+async def hash_drawer():
+    body = """
+    <p>This page uses a hash-drawer pattern. The base page content is always fully visible;
+       the hash triggers a slide-in drawer panel on top of it. This is different from a full
+       SPA hash route — the page is not replaced, only augmented. URLs look like
+       <code>/hash-drawer#/_drawer/ai/aicopilot/</code>. A crawler must decide whether to
+       treat the drawer URL as a separate page from the base URL, and whether the drawer
+       content (JS-rendered) is discoverable at all.</p>
+    <article>
+      <h2>Base page content</h2>
+      <p>This content is always present in the DOM regardless of the hash. The drawer appears
+         on top of this when a <code>#/_drawer/</code> hash is active.</p>
+      <ul>
+        <li><a href="#/_drawer/ai/aicopilot/">Open AI Copilot drawer</a></li>
+        <li><a href="#/_drawer/settings/profile/">Open Settings drawer</a></li>
+        <li><a href="#/_drawer/help/">Open Help drawer</a></li>
+      </ul>
+    </article>
+    <div id="drawer-overlay" style="display:none; position:fixed; top:0; right:0; width:360px;
+         height:100%; background:#fff; box-shadow:-4px 0 16px rgba(0,0,0,.2);
+         padding:1.5rem; overflow-y:auto; z-index:100;">
+      <button id="drawer-close"><a href="#">&#x2715; Close drawer</a></button>
+      <div id="drawer-content"></div>
+    </div>
+    """
+    script = """
+<script>
+  const drawerRoutes = {
+    "/_drawer/ai/aicopilot/":      "<h2>AI Copilot</h2><p>This is the AI Copilot drawer. It opens on top of the base page when the URL hash is <code>#/_drawer/ai/aicopilot/</code>. A crawler that follows this hash link would need to execute JavaScript to see this content.</p><p><a href='#/_drawer/settings/profile/'>Go to Settings drawer</a></p>",
+    "/_drawer/settings/profile/":  "<h2>Settings — Profile</h2><p>This is the Settings Profile drawer. Full URL: <code>/hash-drawer#/_drawer/settings/profile/</code>. The base page content remains visible behind this drawer.</p><p><a href='#/_drawer/help/'>Go to Help drawer</a></p>",
+    "/_drawer/help/":              "<h2>Help</h2><p>This is the Help drawer. Full URL: <code>/hash-drawer#/_drawer/help/</code>. Closing the drawer returns to <code>/hash-drawer</code> with no hash.</p>",
+  };
+
+  const overlay = document.getElementById("drawer-overlay");
+  const content = document.getElementById("drawer-content");
+
+  function renderDrawer() {
+    const hash = window.location.hash;
+    if (hash.startsWith("#/_drawer/")) {
+      const route = hash.slice(1);
+      content.innerHTML = drawerRoutes[route] || "<p>Unknown drawer: <code>" + route + "</code>.</p>";
+      overlay.style.display = "block";
+    } else {
+      overlay.style.display = "none";
+      content.innerHTML = "";
+    }
+  }
+
+  window.addEventListener("hashchange", renderDrawer);
+  renderDrawer();
+</script>"""
+    return html_page("Hash drawer pattern", body, script=script)
 
 
 @app.get("/hash-query-combo", response_class=HTMLResponse)

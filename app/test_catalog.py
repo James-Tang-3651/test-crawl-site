@@ -185,10 +185,6 @@ TEST_SECTIONS: List[Dict[str, Any]] = [
                 "label": "Hash-path router (Angular / Vue hash mode style) page",
                 "home_links": [
                     {"href": "/hash-path-router", "label": "Hash-path router page"},
-                    {"href": "/hash-path-router#/", "label": "Hash-path router - Home route"},
-                    {"href": "/hash-path-router#/about", "label": "Hash-path router - About"},
-                    {"href": "/hash-path-router#/products", "label": "Hash-path router - Products"},
-                    {"href": "/hash-path-router#/products/detail", "label": "Hash-path router - Product detail"},
                 ],
             },
             {
@@ -209,9 +205,6 @@ TEST_SECTIONS: List[Dict[str, Any]] = [
                 "label": "Hashbang router (#! pattern) page",
                 "home_links": [
                     {"href": "/hashbang-router", "label": "Hashbang router page"},
-                    {"href": "/hashbang-router#!/home", "label": "Hashbang router - Home"},
-                    {"href": "/hashbang-router#!/about", "label": "Hashbang router - About"},
-                    {"href": "/hashbang-router#!/contact", "label": "Hashbang router - Contact"},
                 ],
             },
             {
@@ -223,6 +216,15 @@ TEST_SECTIONS: List[Dict[str, Any]] = [
                     {"href": "/percent-encoded-hash", "label": "Percent-encoded hash demo page"},
                     {"href": "/percent-encoded-hash#real-anchor", "label": "Percent-encoded hash - real fragment"},
                     {"href": "/percent-encoded-hash%23real-anchor", "label": "Percent-encoded hash - %23 in path (expect 404)"},
+                ],
+            },
+            {
+                "path": "/hash-drawer",
+                "crawl_worthy": True,
+                "category": "hash_drawer",
+                "label": "Hash drawer pattern page",
+                "home_links": [
+                    {"href": "/hash-drawer", "label": "Hash drawer page"},
                 ],
             },
         ],
@@ -717,7 +719,7 @@ TEST_SECTIONS: List[Dict[str, Any]] = [
     },
     {
         "id": "weather-daily-update-changefrequency",
-        "title": "weather daily update changeFrequency",
+        "title": "weather update changeFrequency",
         "entries": [
             {
                 "path": "/weather/vancouver-daily-report",
@@ -728,6 +730,16 @@ TEST_SECTIONS: List[Dict[str, Any]] = [
                 "location": "Vancouver, BC, Canada",
                 "label": "Vancouver daily weather report",
                 "home_links": [{"href": "/weather/vancouver-daily-report", "label": "Vancouver daily weather report"}],
+            },
+            {
+                "path": "/weather/vancouver-weekly-report",
+                "crawl_worthy": True,
+                "category": "weather_weekly_update_changefreq",
+                "sitemap_changefreq": "weekly",
+                "updates_weekly_at": "Monday 00:00 America/Vancouver",
+                "location": "Vancouver, BC, Canada",
+                "label": "Vancouver weekly weather report",
+                "home_links": [{"href": "/weather/vancouver-weekly-report", "label": "Vancouver weekly weather report"}],
             },
         ],
     },
