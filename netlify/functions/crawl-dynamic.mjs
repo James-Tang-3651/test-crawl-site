@@ -45,7 +45,7 @@ function wait(milliseconds) {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
-const transientLoadFailures = 6;
+const transientLoadFailures = 5;
 const transientLoadCounts = new Map();
 
 const weatherImages = {
@@ -277,7 +277,7 @@ function transientLoadPage(url) {
     `
     <p>Transient load succeeded for key <code>${escapeHtml(key)}</code> after ${count} attempts.</p>
     <p>This route simulates a site migration or update that fails temporarily before becoming crawlable.</p>
-    <a href="/about?from=transient-load">Stable child link after recovery</a>
+    <a href="/transient-load-child">Transient load child page</a>
     `,
   );
 }
