@@ -94,6 +94,20 @@ TEST_SECTIONS: List[Dict[str, Any]] = [
                 "home_links": [{"href": "/localhost-link", "label": "Localhost absolute links page"}],
             },
             {
+                "path": "/long-href",
+                "crawl_worthy": True,
+                "category": "long_href",
+                "href_length_gt": 2048,
+                "label": "Long href over 2048 characters",
+                "home_links": [{"href": "/long-href", "label": "Long href over 2048 characters"}],
+            },
+            {
+                "path": "/long-href-target",
+                "crawl_worthy": True,
+                "category": "long_href_target",
+                "label": "Long href target",
+            },
+            {
                 "path": "/legacy.php",
                 "crawl_worthy": True,
                 "category": "php_path",
@@ -147,6 +161,85 @@ TEST_SECTIONS: List[Dict[str, Any]] = [
                 "include_in_manifest": False,
                 "label": "External URL",
                 "home_links": [{"href": "https://example.org/external", "label": "External URL"}],
+            },
+        ],
+    },
+    {
+        "id": "hash-navigation",
+        "title": "Hash Navigation",
+        "entries": [
+            {
+                "path": "/hash-anchors",
+                "crawl_worthy": True,
+                "category": "hash_anchor_navigation",
+                "label": "Hash anchor sections page",
+                "home_links": [
+                    {"href": "/hash-anchors", "label": "Hash anchor sections page"},
+                    {"href": "/hash-anchors#section-a", "label": "Hash anchor - Section A"},
+                    {"href": "/hash-anchors#section-b", "label": "Hash anchor - Section B"},
+                    {"href": "/hash-anchors#section-c", "label": "Hash anchor - Section C"},
+                ],
+            },
+            {
+                "path": "/hash-router",
+                "crawl_worthy": True,
+                "category": "hash_spa_routing",
+                "label": "Hash router (SPA-style) page",
+                "home_links": [
+                    {"href": "/hash-router", "label": "Hash router (SPA-style) page"},
+                    {"href": "/hash-router#overview", "label": "Hash router - Overview"},
+                    {"href": "/hash-router#specs", "label": "Hash router - Specs"},
+                    {"href": "/hash-router#reviews", "label": "Hash router - Reviews"},
+                ],
+            },
+            {
+                "path": "/hash-path-router",
+                "crawl_worthy": True,
+                "category": "hash_path_routing",
+                "label": "Hash-path router (Angular / Vue hash mode style) page",
+                "home_links": [
+                    {"href": "/hash-path-router", "label": "Hash-path router page"},
+                ],
+            },
+            {
+                "path": "/hash-query-combo",
+                "crawl_worthy": True,
+                "category": "hash_query_combo",
+                "label": "Query string + hash fragment combo page",
+                "home_links": [
+                    {"href": "/hash-query-combo", "label": "Query string + hash fragment combo page"},
+                    {"href": "/hash-query-combo?q=test#results", "label": "Hash query combo - q=test"},
+                    {"href": "/hash-query-combo?q=other#results", "label": "Hash query combo - q=other"},
+                ],
+            },
+            {
+                "path": "/hashbang-router",
+                "crawl_worthy": True,
+                "category": "hashbang_routing",
+                "label": "Hashbang router (#! pattern) page",
+                "home_links": [
+                    {"href": "/hashbang-router", "label": "Hashbang router page"},
+                ],
+            },
+            {
+                "path": "/percent-encoded-hash",
+                "crawl_worthy": True,
+                "category": "percent_encoded_hash",
+                "label": "Percent-encoded hash (%23) vs fragment (#) page",
+                "home_links": [
+                    {"href": "/percent-encoded-hash", "label": "Percent-encoded hash demo page"},
+                    {"href": "/percent-encoded-hash#real-anchor", "label": "Percent-encoded hash - real fragment"},
+                    {"href": "/percent-encoded-hash%23real-anchor", "label": "Percent-encoded hash - %23 in path (expect 404)"},
+                ],
+            },
+            {
+                "path": "/hash-drawer",
+                "crawl_worthy": True,
+                "category": "hash_drawer",
+                "label": "Hash drawer pattern page",
+                "home_links": [
+                    {"href": "/hash-drawer", "label": "Hash drawer page"},
+                ],
             },
         ],
     },
@@ -447,6 +540,15 @@ TEST_SECTIONS: List[Dict[str, Any]] = [
                 "home_links": [{"href": "/slow", "label": "Slow page"}],
             },
             {
+                "path": "/transient-load",
+                "crawl_worthy": True,
+                "category": "transient_load",
+                "failure_count_before_success": 6,
+                "reset_path": "/transient-load/reset",
+                "label": "Transient load failure then success",
+                "home_links": [{"href": "/transient-load?key=homepage", "label": "Transient load failure then success"}],
+            },
+            {
                 "path": "/empty",
                 "crawl_worthy": True,
                 "category": "empty_200",
@@ -495,6 +597,23 @@ TEST_SECTIONS: List[Dict[str, Any]] = [
                 "expected_status": 504,
                 "label": "504 page",
                 "home_links": [{"href": "/status/504", "label": "504 page"}],
+            },
+            {
+                "path": "/status/504-html-external-link",
+                "crawl_worthy": True,
+                "category": "status_page",
+                "expected_status": 504,
+                "label": "504 page with HTML body linking to a nowhere page",
+                "home_links": [
+                    {"href": "/status/504-html-external-link", "label": "504 HTML body with link to nowhere"}
+                ],
+            },
+            {
+                "path": "/error-link-to-nowhere",
+                "crawl_worthy": True,
+                "category": "status_page",
+                "label": "Link-to-nowhere landing page (reached only from 504 HTML body)",
+                "home_links": [],
             },
             {
                 "path": "/wrong-content-type-html-as-text",
@@ -608,6 +727,14 @@ TEST_SECTIONS: List[Dict[str, Any]] = [
                 "label": "Sitemap-only page",
             },
             {
+                "path": "/sitemap-exclusive-edge-case",
+                "crawl_worthy": True,
+                "category": "sitemap_only_unique",
+                "discovery_method": "sitemap",
+                "html_linked": False,
+                "label": "Unique sitemap-only edge case page",
+            },
+            {
                 "path": "/sitemap-discovery-fail",
                 "crawl_worthy": True,
                 "category": "sitemap_discovery_failure",
@@ -622,8 +749,29 @@ TEST_SECTIONS: List[Dict[str, Any]] = [
         ],
     },
     {
+        "id": "char-limit-tests",
+        "title": "Char Limit Tests",
+        "entries": [
+            {
+                "path": "/oversized-metadata",
+                "crawl_worthy": True,
+                "category": "char_limit_oversized_metadata",
+                "title_length_gt": 1024,
+                "mime_type_length_gt": 256,
+                "charset_length_gt": 256,
+                "label": "Oversized title, MIME type, and charset",
+                "home_links": [
+                    {
+                        "href": "/oversized-metadata",
+                        "label": "Oversized title, MIME type, and charset",
+                    }
+                ],
+            },
+        ],
+    },
+    {
         "id": "weather-daily-update-changefrequency",
-        "title": "weather daily update changeFrequency",
+        "title": "weather update changeFrequency",
         "entries": [
             {
                 "path": "/weather/vancouver-daily-report",
@@ -634,6 +782,16 @@ TEST_SECTIONS: List[Dict[str, Any]] = [
                 "location": "Vancouver, BC, Canada",
                 "label": "Vancouver daily weather report",
                 "home_links": [{"href": "/weather/vancouver-daily-report", "label": "Vancouver daily weather report"}],
+            },
+            {
+                "path": "/weather/vancouver-weekly-report",
+                "crawl_worthy": True,
+                "category": "weather_weekly_update_changefreq",
+                "sitemap_changefreq": "weekly",
+                "updates_weekly_at": "Monday 00:00 America/Vancouver",
+                "location": "Vancouver, BC, Canada",
+                "label": "Vancouver weekly weather report",
+                "home_links": [{"href": "/weather/vancouver-weekly-report", "label": "Vancouver weekly weather report"}],
             },
         ],
     },
@@ -748,6 +906,14 @@ TEST_SECTIONS: List[Dict[str, Any]] = [
                 "product_variant_strategy": "separate_pages",
                 "label": "Product variants - Separate pages",
                 "home_links": [{"href": "/product-pages/separate-pages", "label": "Product variants - Separate pages"}],
+            },
+            {
+                "path": "/product-pages/query-params",
+                "crawl_worthy": True,
+                "category": "product_variant_pages",
+                "product_variant_strategy": "query_params",
+                "label": "Product variants - Query params",
+                "home_links": [{"href": "/product-pages/query-params", "label": "Product variants - Query params"}],
             },
             {
                 "path": "/product-pages/javascript-calculated",
@@ -918,12 +1084,27 @@ def _product_variant_entries() -> Iterator[Dict[str, Any]]:
         }
 
 
+def _product_variant_qp_entries() -> Iterator[Dict[str, Any]]:
+    for variant in iter_product_variants():
+        yield {
+            "path": f"/product-pages/query-params?color={variant['color_slug']}&size={variant['size_slug']}",
+            "crawl_worthy": True,
+            "category": "product_variant_page",
+            "product_variant_strategy": "query_params",
+            "color": variant["color_name"],
+            "size": variant["size_name"],
+            "sku": variant["sku"],
+            "label": f"Product variant query param page: {variant['color_name']} / {variant['size_name']}",
+        }
+
+
 def _add_generated_entries() -> None:
     for section in TEST_SECTIONS:
         if section["id"] == "scale-graph":
             section["entries"].extend(_scale_graph_entries())
         if section["id"] == "product-pages":
             section["entries"].extend(_product_variant_entries())
+            section["entries"].extend(_product_variant_qp_entries())
 
 
 def _build_page_manifest() -> List[Dict[str, Any]]:

@@ -1,0 +1,121 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webcrawler-crawlservice
+  namespace: mq
+  labels:
+    application: webcrawler-crawlservice
+    env: mq
+spec:
+  replicas: 5
+  selector:
+    matchLabels:
+      application: webcrawler-crawlservice
+      env: mq
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  revisionHistoryLimit: 10
+  progressDeadlineSeconds: 600
+  template:
+    metadata:
+      labels:
+        application: webcrawler-crawlservice
+        env: mq
+    spec:
+      containers:
+        - name: webcrawler
+          image: images.comm100dev.io/x2/webcrawler/test-van200:2026-05-27-22-01-4d154b35
+          command:
+            - python3
+          args:
+            - main.py
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+          env:
+            - name: MAX_CONCURRENT_PAGE_CRAWLS
+              value: "5"
+            - name: MAX_CONCURRENT_SITEMAP_DISCOVERY
+              value: "5"
+            - name: REQUEST_TOKEN
+              value: cc9dfc7473d3486dac06e1634d4ce38e
+            - name: DeploymentName
+              value: mq
+          resources: {}
+          livenessProbe:
+            tcpSocket:
+              port: 80
+            timeoutSeconds: 1
+            periodSeconds: 10
+            successThreshold: 1
+            failureThreshold: 1
+          startupProbe:
+            tcpSocket:
+              port: 80
+            timeoutSeconds: 1
+            periodSeconds: 10
+            successThreshold: 1
+            failureThreshold: 30
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          imagePullPolicy: Always
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+      dnsPolicy: ClusterFirst
+      securityContext: {}
+      imagePullSecrets:
+        - name: comm100-harbor
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: resource
+                    operator: In
+                    values:
+                      - application
+      schedulerName: default-scheduler
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: webcrawler-crawlservice
+  namespace: mq
+  labels:
+    application: webcrawler-crawlservice
+    env: mq
+spec:
+  type: ClusterIP
+  selector:
+    application: webcrawler-crawlservice
+    env: mq
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: webcrawler-crawlservice
+  namespace: mq
+  labels:
+    application: webcrawler-crawlservice
+    env: mq
+spec:
+  rules:
+    - host: webcrawler-crawlservice.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: webcrawler-crawlservice
+                port:
+                  number: 80

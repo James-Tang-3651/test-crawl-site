@@ -11,14 +11,35 @@ uvicorn app.main:app --host 0.0.0.0 --port 9000
 
 ## Deployment Strategy
 
-This site supports two deployment targets:
+This site supports three deployment targets:
 
+- Render is the primary live FastAPI deployment target for request-time crawl
+  cases.
 - Netlify remains the known-good fallback deployment.
 - Railway runs the live FastAPI app directly and should be treated as the
-  experimental deployment until it passes verification.
+  alternate live deployment option.
 
-Do not remove or reconfigure the Netlify files until the Railway deployment has
+Do not remove or reconfigure the Netlify files until the Render deployment has
 been verified against the crawler test routes.
+
+## Deploy on Render
+
+Render should deploy the live FastAPI app from the same public GitHub repo used
+by the other deployment targets.
+
+Render settings are committed in `render.yaml`:
+
+- Runtime: Python
+- Build command: `pip install -r requirements.txt`
+- Start command: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+- Healthcheck path: `/`
+- Python version: `3.10`, pinned by `.python-version`
+
+Render runs `app.main:app` directly and does not use the generated `dist`
+folder. Request-time routes such as `/transient-load` are authoritative on
+Render. The `/transient-load` counter is per service process, resets on
+deploy/restart, and can be reset explicitly with
+`/transient-load/reset?key=<run-id>`.
 
 ## Deploy on Railway
 
@@ -65,8 +86,8 @@ codes, and redirects are available from the deployed site.
 Routes with request-time behavior, including localized `/about`, are served by
 `netlify/functions/crawl-dynamic.mjs`.
 
-Netlify files intentionally remain unchanged so the existing deployment can be
-used as a rollback path if Railway deployment or verification fails.
+Netlify files remain as a compatibility path so the existing deployment can be
+used as a rollback path if Render deployment or verification fails.
 
 For local export verification:
 
@@ -81,7 +102,7 @@ explicitly.
 
 ## Deployment Verification
 
-After both deployments are available, compare the Netlify URL and Railway URL for
+After deployments are available, compare the Netlify URL and Render URL for
 these routes:
 
 - `/`
@@ -92,12 +113,17 @@ these routes:
 - `/status/429`
 - `/status/500`
 - `/status/504`
+- `/long-href`
+- `/oversized-metadata`
+- `/sitemap-exclusive-edge-case`
+- `/transient-load/reset?key=readme`
+- `/transient-load?key=readme`
 - `/files/sample.pdf`
 - `/files/sample.docx`
 - `/media/png-example.png`
 - `/weather/vancouver-daily-report/data.json`
 
-Railway should serve dynamic routes from FastAPI directly instead of
+Render should serve dynamic routes from FastAPI directly instead of
 `netlify/functions/crawl-dynamic.mjs`, but status codes, content types, and
 crawler-facing behavior should match Netlify.
 
@@ -105,6 +131,11 @@ crawler-facing behavior should match Netlify.
 
 - `/` root page with mixed links
 - `/_manifest` machine-readable page inventory
+- `/long-href` page with an href longer than 2048 characters
+- `/transient-load?key=<run-id>` page that returns 503 for six requests, then 200
+- `/transient-load/reset?key=<run-id>` reset endpoint for transient load tests
+- `/oversized-metadata` char-limit page for title, MIME type, and charset
+- `/sitemap-exclusive-edge-case` unique page discoverable only from sitemap output
 - `/files/sample.pdf` sample file link
 - `/media/pixel.jpg` sample image link
 
@@ -123,6 +154,7 @@ Current sections:
 - Errors and Status
 - Media and Embeds
 - Discovery and Policy
+- Char Limit Tests
 - Scale and Graph Shape
 - Localization and State
 - Product Pages

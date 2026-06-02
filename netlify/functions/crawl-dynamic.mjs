@@ -45,6 +45,9 @@ function wait(milliseconds) {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
+const transientLoadFailures = 6;
+const transientLoadCounts = new Map();
+
 const weatherImages = {
   sunny: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 160"><rect width="240" height="160" fill="#e7f5ff"/><circle cx="120" cy="78" r="34" fill="#ffd43b"/><g stroke="#f08c00" stroke-width="8" stroke-linecap="round"><path d="M120 18v18"/><path d="M120 120v18"/><path d="M60 78H42"/><path d="M198 78h-18"/><path d="m77 35 13 13"/><path d="m163 121-13-13"/><path d="m77 121 13-13"/><path d="m163 35-13 13"/></g></svg>',
   cloudy: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 160"><rect width="240" height="160" fill="#edf2ff"/><path fill="#adb5bd" d="M74 112c-21 0-38-15-38-34 0-18 15-32 34-34 10-21 32-34 57-34 34 0 62 24 65 55 16 5 27 18 27 34 0 19-17 34-38 34H74Z"/><path fill="#dee2e6" d="M66 124c-18 0-33-13-33-30 0-15 12-28 29-30 9-18 28-29 50-29 30 0 54 21 57 48 14 4 24 16 24 30 0 17-15 30-33 30H66Z"/></svg>',
@@ -249,6 +252,44 @@ async function slowPage() {
   );
 }
 
+function transientLoadPage(url) {
+  const key = url.searchParams.get("key") || "default";
+  const count = (transientLoadCounts.get(key) || 0) + 1;
+  transientLoadCounts.set(key, count);
+
+  // Netlify may recycle function instances, so Render/FastAPI remains the
+  // authoritative host for deterministic transient-load testing.
+  if (count <= transientLoadFailures) {
+    return new Response(
+      `Transient load attempt ${count} failed. Attempt ${transientLoadFailures + 1} will succeed.`,
+      {
+        status: 503,
+        headers: {
+          "content-type": "text/plain; charset=utf-8",
+          "retry-after": "1",
+        },
+      },
+    );
+  }
+
+  return htmlResponse(
+    "Transient Load Succeeded",
+    `
+    <p>Transient load succeeded for key <code>${escapeHtml(key)}</code> after ${count} attempts.</p>
+    <p>This route simulates a site migration or update that fails temporarily before becoming crawlable.</p>
+    <a href="/about?from=transient-load">Stable child link after recovery</a>
+    `,
+  );
+}
+
+function transientLoadReset(url) {
+  const key = url.searchParams.get("key") || "default";
+  transientLoadCounts.delete(key);
+  return new Response(JSON.stringify({key, reset: true, failure_count_before_success: transientLoadFailures}), {
+    headers: {"content-type": "application/json; charset=utf-8"},
+  });
+}
+
 async function status504Page() {
   return new Response("Gateway timeout test page", {
     status: 504,
@@ -276,7 +317,6 @@ async function vancouverDailyWeatherReport() {
       <img id="weather-image" src="${escapeHtml(weather.image.src)}" alt="${escapeHtml(weather.image.alt)}" width="240" height="160" />
       <p>This daily weather report updates by Vancouver local date at 00:00 America/Vancouver.</p>
       <p id="weather-source-sentence">${escapeHtml(weather.source_sentence)}</p>
-      <a href="/sitemap.xml">Sitemap with daily change frequency</a>
     </article>
     <script>
       const weatherCitySelect = document.querySelector("#weather-city");
@@ -307,6 +347,137 @@ async function vancouverDailyWeatherReportData(url) {
   return new Response(JSON.stringify(payload), {
     headers: {"content-type": "application/json; charset=utf-8"},
   });
+}
+
+const vancouverLatitude = 49.2827;
+const vancouverLongitude = -123.1207;
+const forecastApiUrl =
+  `https://api.open-meteo.com/v1/forecast?latitude=${vancouverLatitude}&longitude=${vancouverLongitude}` +
+  "&daily=weathercode,temperature_2m_max,temperature_2m_min&timezone=America%2FVancouver&forecast_days=7";
+const forecastSourceSentence = "Weather source: Open-Meteo / open-meteo.com.";
+
+// WMO weather interpretation codes returned by Open-Meteo's "weathercode" field.
+const wmoWeatherSummaries = {
+  0: "Clear sky",
+  1: "Mainly clear",
+  2: "Partly cloudy",
+  3: "Overcast",
+  45: "Fog",
+  48: "Depositing rime fog",
+  51: "Light drizzle",
+  53: "Moderate drizzle",
+  55: "Dense drizzle",
+  56: "Light freezing drizzle",
+  57: "Dense freezing drizzle",
+  61: "Slight rain",
+  63: "Moderate rain",
+  65: "Heavy rain",
+  66: "Light freezing rain",
+  67: "Heavy freezing rain",
+  71: "Slight snow",
+  73: "Moderate snow",
+  75: "Heavy snow",
+  77: "Snow grains",
+  80: "Slight rain showers",
+  81: "Moderate rain showers",
+  82: "Violent rain showers",
+  85: "Slight snow showers",
+  86: "Heavy snow showers",
+  95: "Thunderstorm",
+  96: "Thunderstorm with slight hail",
+  99: "Thunderstorm with heavy hail",
+};
+
+function wmoSummary(code) {
+  return wmoWeatherSummaries[code] ?? "unavailable";
+}
+
+function formatForecastTemp(value) {
+  return typeof value === "number" ? `${Math.round(value)}°C` : "unavailable";
+}
+
+function formatForecastDay(iso) {
+  const names = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const [year, month, day] = String(iso).split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  const mm = String(month).padStart(2, "0");
+  const dd = String(day).padStart(2, "0");
+  return {name: names[date.getUTCDay()], date: `${mm}/${dd}/${year}`};
+}
+
+async function fetchVancouverForecast() {
+  try {
+    const response = await fetch(forecastApiUrl, {
+      headers: {"user-agent": "crawl-test-site/1.0"},
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!response.ok) {
+      return [];
+    }
+    const data = await response.json();
+    const daily = data.daily || {};
+    const times = daily.time || [];
+    const codes = daily.weathercode || [];
+    const highs = daily.temperature_2m_max || [];
+    const lows = daily.temperature_2m_min || [];
+    return times.map((iso, index) => {
+      const {name, date} = formatForecastDay(iso);
+      return {
+        name,
+        date,
+        summary: wmoSummary(codes[index]),
+        high: formatForecastTemp(highs[index]),
+        low: formatForecastTemp(lows[index]),
+      };
+    });
+  } catch {
+    return [];
+  }
+}
+
+async function vancouverWeeklyWeatherReport() {
+  const location = weatherLocations[defaultWeatherCity];
+  const forecast = await fetchVancouverForecast();
+
+  if (forecast.length === 0) {
+    const body = `
+    <article>
+      <p id="weather-week-range">Weekly weather forecast for ${escapeHtml(location.sentenceName)} is unavailable right now.</p>
+      <p id="weather-source-sentence">${escapeHtml(forecastSourceSentence)}</p>
+    </article>
+    `;
+    return htmlResponse("Vancouver weekly weather report", body);
+  }
+
+  const weekStart = forecast[0].date;
+  const weekEnd = forecast[forecast.length - 1].date;
+  const imageKind = weatherImageKind(forecast[0].summary);
+  const imageSrc = weatherImageSrc(imageKind);
+  const rows = forecast
+    .map(
+      (day) =>
+        `<tr><th scope="row">${escapeHtml(day.name)}</th><td>${escapeHtml(day.date)}</td>` +
+        `<td>${escapeHtml(day.summary)}</td><td>${escapeHtml(day.high)}</td><td>${escapeHtml(day.low)}</td></tr>`,
+    )
+    .join("");
+  const body = `
+    <article>
+      <p id="weather-week-range">Weekly weather forecast for ${escapeHtml(location.sentenceName)}, ${escapeHtml(weekStart)} to ${escapeHtml(weekEnd)}.</p>
+      <img id="weather-image" src="${escapeHtml(imageSrc)}" alt="Generic ${escapeHtml(imageKind)} weather image" width="240" height="160" />
+      <table class="weekly-weather">
+        <thead>
+          <tr><th scope="col">Day</th><th scope="col">Date</th><th scope="col">Outlook</th><th scope="col">High</th><th scope="col">Low</th></tr>
+        </thead>
+        <tbody>
+          ${rows}
+        </tbody>
+      </table>
+      <p>This weekly weather forecast updates by Vancouver local date each Monday at 00:00 America/Vancouver.</p>
+      <p id="weather-source-sentence">${escapeHtml(forecastSourceSentence)}</p>
+    </article>
+    `;
+
+  return htmlResponse("Vancouver weekly weather report", body);
 }
 
 export default async function handler(request) {
@@ -346,12 +517,24 @@ export default async function handler(request) {
     return status504Page();
   }
 
+  if (url.pathname === "/transient-load") {
+    return transientLoadPage(url);
+  }
+
+  if (url.pathname === "/transient-load/reset") {
+    return transientLoadReset(url);
+  }
+
   if (url.pathname === "/weather/vancouver-daily-report") {
     return vancouverDailyWeatherReport();
   }
 
   if (url.pathname === "/weather/vancouver-daily-report/data.json") {
     return vancouverDailyWeatherReportData(url);
+  }
+
+  if (url.pathname === "/weather/vancouver-weekly-report") {
+    return vancouverWeeklyWeatherReport();
   }
 
   return new Response("Not found", {
@@ -369,7 +552,10 @@ export const config = {
     "/redirect-middle",
     "/slow",
     "/status/504",
+    "/transient-load",
+    "/transient-load/reset",
     "/weather/vancouver-daily-report",
     "/weather/vancouver-daily-report/data.json",
+    "/weather/vancouver-weekly-report",
   ],
 };

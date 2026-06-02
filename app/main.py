@@ -128,6 +128,14 @@ LOAD_TEST_LOREM_PARAGRAPHS = [
     "Nulla facilisi. Ut fringilla, suspendisse potenti, nunc feugiat mi a tellus consequat imperdiet, vestibulum sapien proin quam.",
     "Etiam ultrices, suspendisse in justo eu magna luctus suscipit. Sed lectus, integer euismod lacus luctus magna, quisque cursus metus vitae pharetra auctor.",
 ]
+LONG_HREF_PAYLOAD = "long-url-segment-" + ("a" * 2100)
+LONG_HREF_PATH = f"/long-href-target?{urlencode({'payload': LONG_HREF_PAYLOAD})}"
+TRANSIENT_LOAD_FAILURES = 6
+transient_load_counts: dict[str, int] = {}
+OVERSIZED_TITLE = "Oversized Metadata Title " + ("T" * 1100)
+OVERSIZED_MIME_TYPE = "application/" + ("vnd.crawltest." * 22) + "html"
+OVERSIZED_CHARSET = "utf-" + ("crawltest-" * 32) + "8"
+OVERSIZED_CONTENT_TYPE = f"{OVERSIZED_MIME_TYPE}; charset={OVERSIZED_CHARSET}"
 
 VANCOUVER_TZ = ZoneInfo("America/Vancouver")
 DEFAULT_WEATHER_CITY = "vancouver"
@@ -146,6 +154,57 @@ WEATHER_IMAGES = {
     "cloudy": """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 160"><rect width="240" height="160" fill="#edf2ff"/><path fill="#adb5bd" d="M74 112c-21 0-38-15-38-34 0-18 15-32 34-34 10-21 32-34 57-34 34 0 62 24 65 55 16 5 27 18 27 34 0 19-17 34-38 34H74Z"/><path fill="#dee2e6" d="M66 124c-18 0-33-13-33-30 0-15 12-28 29-30 9-18 28-29 50-29 30 0 54 21 57 48 14 4 24 16 24 30 0 17-15 30-33 30H66Z"/></svg>""",
     "rainy": """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 160"><rect width="240" height="160" fill="#e3fafc"/><path fill="#868e96" d="M74 92c-19 0-34-13-34-30 0-16 13-29 31-30 9-18 29-30 52-30 31 0 57 22 59 50 15 4 26 17 26 31 0 17-15 30-34 30H74Z"/><g stroke="#228be6" stroke-width="8" stroke-linecap="round"><path d="m76 126-10 20"/><path d="m118 126-10 20"/><path d="m160 126-10 20"/></g></svg>""",
 }
+
+# Open-Meteo provides a free 7-day daily forecast with no API key, used for the
+# weekly weather report. Vancouver, BC coordinates.
+VANCOUVER_LATITUDE = 49.2827
+VANCOUVER_LONGITUDE = -123.1207
+FORECAST_API_URL = (
+    "https://api.open-meteo.com/v1/forecast"
+    f"?latitude={VANCOUVER_LATITUDE}&longitude={VANCOUVER_LONGITUDE}"
+    "&daily=weathercode,temperature_2m_max,temperature_2m_min"
+    "&timezone=America%2FVancouver&forecast_days=7"
+)
+FORECAST_SOURCE_SENTENCE = "Weather source: Open-Meteo / open-meteo.com."
+
+# WMO weather interpretation codes returned by Open-Meteo's "weathercode" field.
+WMO_WEATHER_SUMMARIES = {
+    0: "Clear sky",
+    1: "Mainly clear",
+    2: "Partly cloudy",
+    3: "Overcast",
+    45: "Fog",
+    48: "Depositing rime fog",
+    51: "Light drizzle",
+    53: "Moderate drizzle",
+    55: "Dense drizzle",
+    56: "Light freezing drizzle",
+    57: "Dense freezing drizzle",
+    61: "Slight rain",
+    63: "Moderate rain",
+    65: "Heavy rain",
+    66: "Light freezing rain",
+    67: "Heavy freezing rain",
+    71: "Slight snow",
+    73: "Moderate snow",
+    75: "Heavy snow",
+    77: "Snow grains",
+    80: "Slight rain showers",
+    81: "Moderate rain showers",
+    82: "Violent rain showers",
+    85: "Slight snow showers",
+    86: "Heavy snow showers",
+    95: "Thunderstorm",
+    96: "Thunderstorm with slight hail",
+    99: "Thunderstorm with heavy hail",
+}
+
+
+def wmo_summary(code) -> str:
+    try:
+        return WMO_WEATHER_SUMMARIES.get(int(code), "unavailable")
+    except (TypeError, ValueError):
+        return "unavailable"
 
 
 def html_document(title: str, body: str, head: str = "", script: str = "", lang: str = "") -> str:
@@ -326,7 +385,6 @@ def vancouver_daily_weather_body() -> str:
       <img id="weather-image" src="{escape(weather["image"]["src"], quote=True)}" alt="{escape(weather["image"]["alt"], quote=True)}" width="240" height="160" />
       <p>This daily weather report updates by Vancouver local date at 00:00 America/Vancouver.</p>
       <p id="weather-source-sentence">{escape(weather["source_sentence"])}</p>
-      <a href="/sitemap.xml">Sitemap with daily change frequency</a>
     </article>
     """
 
@@ -352,6 +410,82 @@ def vancouver_daily_weather_script() -> str:
 
       weatherCitySelect.addEventListener("change", updateWeatherCity);
     </script>
+    """
+
+
+def _format_forecast_temp(value) -> str:
+    return f"{round(value)}°C" if isinstance(value, (int, float)) else "unavailable"
+
+
+def fetch_vancouver_forecast() -> List[dict]:
+    request = urllib.request.Request(
+        FORECAST_API_URL,
+        headers={"User-Agent": "crawl-test-site/1.0"},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=5) as response:
+            data = json.loads(response.read().decode("utf-8", errors="replace"))
+    except (OSError, urllib.error.URLError, TimeoutError, ValueError):
+        return []
+
+    daily = data.get("daily") or {}
+    times = daily.get("time") or []
+    codes = daily.get("weathercode") or []
+    highs = daily.get("temperature_2m_max") or []
+    lows = daily.get("temperature_2m_min") or []
+
+    days = []
+    for index, day_iso in enumerate(times):
+        try:
+            day_date = datetime.strptime(day_iso, "%Y-%m-%d")
+        except (TypeError, ValueError):
+            continue
+        days.append({
+            "name": day_date.strftime("%A"),
+            "date": day_date.strftime("%m/%d/%Y"),
+            "summary": wmo_summary(codes[index] if index < len(codes) else None),
+            "high": _format_forecast_temp(highs[index] if index < len(highs) else None),
+            "low": _format_forecast_temp(lows[index] if index < len(lows) else None),
+        })
+    return days
+
+
+def vancouver_weekly_weather_body() -> str:
+    location = WEATHER_LOCATIONS[DEFAULT_WEATHER_CITY]
+    forecast = fetch_vancouver_forecast()
+
+    if not forecast:
+        return f"""
+    <article>
+      <p id="weather-week-range">Weekly weather forecast for {escape(location["sentence_name"])} is unavailable right now.</p>
+      <p id="weather-source-sentence">{escape(FORECAST_SOURCE_SENTENCE)}</p>
+    </article>
+    """
+
+    week_start = forecast[0]["date"]
+    week_end = forecast[-1]["date"]
+    image_kind = weather_image_kind(forecast[0]["summary"])
+    image_src = weather_image_src(image_kind)
+    rows = "".join(
+        f'<tr><th scope="row">{escape(day["name"])}</th><td>{escape(day["date"])}</td>'
+        f'<td>{escape(day["summary"])}</td><td>{escape(day["high"])}</td><td>{escape(day["low"])}</td></tr>'
+        for day in forecast
+    )
+    return f"""
+    <article>
+      <p id="weather-week-range">Weekly weather forecast for {escape(location["sentence_name"])}, {escape(week_start)} to {escape(week_end)}.</p>
+      <img id="weather-image" src="{escape(image_src, quote=True)}" alt="Generic {escape(image_kind)} weather image" width="240" height="160" />
+      <table class="weekly-weather">
+        <thead>
+          <tr><th scope="col">Day</th><th scope="col">Date</th><th scope="col">Outlook</th><th scope="col">High</th><th scope="col">Low</th></tr>
+        </thead>
+        <tbody>
+          {rows}
+        </tbody>
+      </table>
+      <p>This weekly weather forecast updates by Vancouver local date each Monday at 00:00 America/Vancouver.</p>
+      <p id="weather-source-sentence">{escape(FORECAST_SOURCE_SENTENCE)}</p>
+    </article>
     """
 
 
@@ -844,6 +978,48 @@ def product_variant_matrix() -> str:
     return "".join(rows)
 
 
+def product_query_params_path(color_slug: str, size_slug: str) -> str:
+    return f"/product-pages/query-params?color={color_slug}&size={size_slug}"
+
+
+def product_color_links_qp(selected_color: str, selected_size: str) -> str:
+    links = []
+    for color_slug, color in PRODUCT_COLORS.items():
+        current = ' aria-current="page"' if color_slug == selected_color else ""
+        links.append(
+            f'<a href="{product_query_params_path(color_slug, selected_size)}"{current}>'
+            f"{escape(color['name'])}</a>"
+        )
+    return "".join(links)
+
+
+def product_size_links_qp(selected_color: str, selected_size: str) -> str:
+    links = []
+    for size_slug, size in PRODUCT_SIZES.items():
+        current = ' aria-current="page"' if size_slug == selected_size else ""
+        links.append(
+            f'<a href="{product_query_params_path(selected_color, size_slug)}"{current}>'
+            f"{escape(size['name'])}</a>"
+        )
+    return "".join(links)
+
+
+def product_variant_matrix_qp() -> str:
+    rows = []
+    for variant in iter_product_variants():
+        href = product_query_params_path(variant["color_slug"], variant["size_slug"])
+        rows.append(
+            f"""
+        <tr>
+          <td><a href="{href}">{escape(variant['color_name'])} / {escape(variant['size_name'])}</a></td>
+          <td>{escape(variant['sku'])}</td>
+          <td>{escape(variant['price'])}</td>
+          <td>{escape(variant['stock_status'])}</td>
+        </tr>"""
+        )
+    return "".join(rows)
+
+
 def product_feature_items(variant: dict) -> str:
     return "".join(f"<li>{escape(feature)}</li>" for feature in variant["feature_bullets"])
 
@@ -1206,6 +1382,32 @@ async def slow():
     return html_page("Slow Page", '<p>Slow page finished after a delay.</p><a href="/query-page?ref=slow">Query from slow page</a>')
 
 
+@app.get("/transient-load")
+async def transient_load(key: str = "default"):
+    count = transient_load_counts.get(key, 0) + 1
+    transient_load_counts[key] = count
+
+    if count <= TRANSIENT_LOAD_FAILURES:
+        return PlainTextResponse(
+            f"Transient load attempt {count} failed. Attempt {TRANSIENT_LOAD_FAILURES + 1} will succeed.",
+            status_code=503,
+            headers={"Retry-After": "1"},
+        )
+
+    body = f"""
+    <p>Transient load succeeded for key <code>{escape(key)}</code> after {count} attempts.</p>
+    <p>This route simulates a site migration or update that fails temporarily before becoming crawlable.</p>
+    <a href="/about?from=transient-load">Stable child link after recovery</a>
+    """
+    return html_page("Transient Load Succeeded", body)
+
+
+@app.get("/transient-load/reset")
+async def transient_load_reset(key: str = "default"):
+    transient_load_counts.pop(key, None)
+    return JSONResponse({"key": key, "reset": True, "failure_count_before_success": TRANSIENT_LOAD_FAILURES})
+
+
 @app.get("/empty", response_class=HTMLResponse)
 async def empty():
     return html_page("Empty Page", "")
@@ -1450,6 +1652,59 @@ async def product_separate_pages_variant(color_slug: str, size_slug: str):
     if color_slug not in PRODUCT_COLORS or size_slug not in PRODUCT_SIZES:
         return PlainTextResponse("Unknown product variant", status_code=404)
     return product_separate_page(color_slug, size_slug)
+
+
+def product_query_params_page(color_slug: str, size_slug: str) -> HTMLResponse:
+    variant = product_variant(color_slug, size_slug)
+    title = f"Product variants - Query params: {variant['color_name']} {variant['size_name']}"
+    body = f"""
+    <nav class="product-breadcrumbs" aria-label="Breadcrumb">
+      <a href="/">Home</a>
+      <span>/</span>
+      <a href="/product-pages/query-params">Product Pages (Query Params)</a>
+      <span>/</span>
+      <span>{escape(variant['color_name'])} {escape(variant['size_name'])}</span>
+    </nav>
+    <article class="product-grid">
+      <section class="product-visual" style="--swatch: {escape(variant['swatch'], quote=True)}">
+        <strong>{escape(variant['visual_label'])}</strong>
+      </section>
+      <section>
+        <p>{escape(PRODUCT_BRAND)}</p>
+        <h2>{escape(PRODUCT_NAME)}</h2>
+        <p>{escape(PRODUCT_RATING)} stars from {escape(PRODUCT_REVIEW_COUNT)} reviews</p>
+        <p class="product-price">{escape(variant['price'])}</p>
+        <p><strong>Selected:</strong> {escape(variant['color_name'])} / {escape(variant['size_name'])}</p>
+        <p><strong>SKU:</strong> {escape(variant['sku'])}</p>
+        <p><strong>Availability:</strong> {escape(variant['stock_status'])} ({variant['stock_quantity']} units)</p>
+        <p><strong>Shipping:</strong> {escape(variant['shipping_message'])}</p>
+        <h3>Color</h3>
+        <div class="variant-options">{product_color_links_qp(color_slug, size_slug)}</div>
+        <h3>Size</h3>
+        <div class="variant-options">{product_size_links_qp(color_slug, size_slug)}</div>
+      </section>
+    </article>
+    {product_common_sections(variant)}
+    <section class="product-section">
+      <h2>All Query Param Variant URLs</h2>
+      <table class="variant-matrix">
+        <thead>
+          <tr><th>Variant page</th><th>SKU</th><th>Price</th><th>Stock</th></tr>
+        </thead>
+        <tbody>
+          {product_variant_matrix_qp()}
+        </tbody>
+      </table>
+    </section>
+    """
+    return html_page(title, body, head=product_page_head())
+
+
+@app.get("/product-pages/query-params", response_class=HTMLResponse)
+async def product_query_params_variant(color: str = PRODUCT_DEFAULT_COLOR, size: str = PRODUCT_DEFAULT_SIZE):
+    if color not in PRODUCT_COLORS or size not in PRODUCT_SIZES:
+        return PlainTextResponse("Unknown product variant", status_code=404)
+    return product_query_params_page(color, size)
 
 
 @app.get("/product-pages/javascript-calculated", response_class=HTMLResponse)
@@ -2920,14 +3175,9 @@ async def redirect_loop_a():
     return RedirectResponse("/redirect-loop-b", status_code=302)
 
 
-@app.get("/redirect-loop-b", response_class=HTMLResponse)
+@app.get("/redirect-loop-b")
 async def redirect_loop_b():
-    body = """
-    <p>Redirect loop B is a valid renderable page reached after /redirect-loop-a redirects here.</p>
-    <p>This page includes body content so browser-based checks can confirm the redirect target loaded.</p>
-    <a href="/about?from=redirect-loop-b">About child from redirect loop B</a>
-    """
-    return html_page("Redirect Loop B", body)
+    return RedirectResponse("/redirect-loop-a", status_code=302)
 
 
 @app.get("/depth/0", response_class=HTMLResponse)
@@ -3008,6 +3258,15 @@ async def sitemap_only():
     return html_page("Sitemap Only Page", body)
 
 
+@app.get("/sitemap-exclusive-edge-case", response_class=HTMLResponse)
+async def sitemap_exclusive_edge_case():
+    body = """
+    <p>This unique page is intentionally discoverable only from sitemap output.</p>
+    <p>It is not linked from the homepage, redirects, robots.txt, iframes, base tag pages, or button flows.</p>
+    """
+    return html_page("Unique Sitemap-Only Edge Case", body)
+
+
 @app.get("/sitemap-discovery-fail", response_class=HTMLResponse)
 async def sitemap_discovery_fail():
     head = '<link rel="sitemap" type="application/xml" href="/sitemap-discovery-fail.xml" />'
@@ -3045,6 +3304,14 @@ async def weather_vancouver_daily_report_data(city: str = DEFAULT_WEATHER_CITY):
     return JSONResponse(weather_payload(city))
 
 
+@app.get("/weather/vancouver-weekly-report", response_class=HTMLResponse)
+async def weather_vancouver_weekly_report():
+    return html_page(
+        "Vancouver weekly weather report",
+        vancouver_weekly_weather_body(),
+    )
+
+
 @app.get("/localhost-link", response_class=HTMLResponse)
 async def localhost_link(request: Request):
     port = request.url.port
@@ -3059,6 +3326,38 @@ async def localhost_link(request: Request):
     </ul>
     """
     return html_page("Localhost Links", body)
+
+
+@app.get("/long-href", response_class=HTMLResponse)
+async def long_href():
+    body = f"""
+    <p>This page contains an anchor whose href is longer than 2048 characters.</p>
+    <p>Measured href length: {len(LONG_HREF_PATH)} characters.</p>
+    <a id="long-href-link" href="{escape(LONG_HREF_PATH, quote=True)}">Long href target</a>
+    """
+    return html_page("Long href over 2048 characters", body)
+
+
+@app.get("/long-href-target", response_class=HTMLResponse)
+async def long_href_target(payload: str = ""):
+    body = f"""
+    <p>Long href target loaded successfully.</p>
+    <p>Payload length: {len(payload)} characters.</p>
+    <a href="/long-href">Back to long href source</a>
+    """
+    return html_page("Long href target", body)
+
+
+@app.get("/oversized-metadata")
+async def oversized_metadata():
+    body = """
+    <article>
+      <p>This page intentionally exceeds common database column lengths for title, MIME type, and charset.</p>
+      <p>The Content-Type header uses valid token syntax while exceeding 256 characters for both media type and charset.</p>
+    </article>
+    """
+    content = html_document(OVERSIZED_TITLE, body)
+    return Response(content=content, headers={"Content-Type": OVERSIZED_CONTENT_TYPE})
 
 
 @app.get("/wrong-content-type-html-as-text")
@@ -3268,6 +3567,292 @@ async def status_500():
 @app.get("/status/504")
 async def status_504():
     return PlainTextResponse("Gateway timeout test page", status_code=504, headers={"Retry-After": "3"})
+
+
+@app.get("/status/504-html-external-link")
+async def status_504_html_external_link():
+    body = """
+    <h1>504 Gateway Timeout</h1>
+    <p>The upstream server did not respond in time. This error page is intentionally
+       served as <code>text/html</code> with a non-empty body so that crawler behaviour
+       on HTML-bodied error responses can be exercised.</p>
+    <p>For more information, follow this
+       <a href="/error-link-to-nowhere">helpful reference link</a>.</p>
+    <p>You can also <a href="/about">return to the About page</a> while the upstream recovers.</p>
+    """
+    return HTMLResponse(
+        content=html_document("Gateway Timeout (HTML body with link to nowhere)", body),
+        status_code=504,
+        headers={"Retry-After": "3"},
+    )
+
+
+@app.get("/error-link-to-nowhere", response_class=HTMLResponse)
+async def error_link_to_nowhere():
+    body = """
+    <h1>Error link that leads to nowhere</h1>
+    <p>You followed a link from an error page. It led here. There is nothing useful on this page.</p>
+    <p>This page exists so the crawler can confirm that links embedded inside HTML-bodied error
+       responses are (or are not) followed, and to give those followed links a deterministic landing
+       target.</p>
+    """
+    return html_page("Error link that leads to nowhere", body)
+
+
+@app.get("/hash-anchors", response_class=HTMLResponse)
+async def hash_anchors():
+    body = """
+    <p>This page uses traditional anchor-based hash navigation. All three sections are always
+       present in the HTML — the hash only controls scroll position, not what is rendered.
+       A crawler should treat <code>/hash-anchors</code>, <code>/hash-anchors#section-a</code>,
+       and <code>/hash-anchors#section-b</code> as the same page.</p>
+    <nav>
+      <a href="#section-a">Section A</a>
+      <a href="#section-b">Section B</a>
+      <a href="#section-c">Section C</a>
+    </nav>
+    <section id="section-a">
+      <h2>Section A</h2>
+      <p>Content for section A. This is a traditional anchor link target — always rendered in the HTML.</p>
+      <a href="#section-b">Jump to Section B</a>
+    </section>
+    <section id="section-b">
+      <h2>Section B</h2>
+      <p>Content for section B. The hash controls scroll position only, not what is rendered on the server.</p>
+      <a href="#section-c">Jump to Section C</a>
+    </section>
+    <section id="section-c">
+      <h2>Section C</h2>
+      <p>Content for section C. All three sections exist in the DOM regardless of the current hash.</p>
+      <a href="#section-a">Back to Section A</a>
+    </section>
+    """
+    return html_page("Hash anchor sections", body)
+
+
+@app.get("/hash-router", response_class=HTMLResponse)
+async def hash_router():
+    body = """
+    <p>This page uses hash-based SPA routing. Only one section is visible at a time — JavaScript
+       reads <code>window.location.hash</code> and renders matching content into the page.
+       A crawler would need to follow each hash link and execute the JavaScript to see the content
+       for <code>#overview</code>, <code>#specs</code>, and <code>#reviews</code>.</p>
+    <nav>
+      <a href="#overview">Overview</a>
+      <a href="#specs">Specs</a>
+      <a href="#reviews">Reviews</a>
+    </nav>
+    <div id="hash-content">
+      <p><em>Loading route...</em></p>
+    </div>
+    """
+    script = """
+<script>
+  const routes = {
+    "overview": "<h2>Overview</h2><p>This is the overview section. It is only in the DOM when the hash is <code>#overview</code> or absent.</p><p><a href='/about'>About page</a></p>",
+    "specs":    "<h2>Specs</h2><p>This is the specs section. A crawler that does not execute JavaScript will never see this content.</p>",
+    "reviews":  "<h2>Reviews</h2><p>This is the reviews section. Each hash route is a separate content state on a single URL path.</p>",
+  };
+
+  function renderRoute() {
+    const hash = window.location.hash.slice(1) || "overview";
+    document.getElementById("hash-content").innerHTML =
+      routes[hash] || "<p>Unknown route: <code>" + hash + "</code>.</p>";
+  }
+
+  window.addEventListener("hashchange", renderRoute);
+  renderRoute();
+</script>"""
+    return html_page("Hash router (SPA-style)", body, script=script)
+
+
+@app.get("/hash-path-router", response_class=HTMLResponse)
+async def hash_path_router():
+    body = """
+    <p>This page uses hash-path routing — the URL hash contains a full routable path
+       (e.g. <code>/hash-path-router#/products/detail</code>). This is the pattern used by
+       Angular, Vue Router in hash mode, and React HashRouter. The server always returns the
+       same HTML regardless of the hash; all routing is handled client-side by JavaScript
+       reading <code>window.location.hash</code>.</p>
+    <nav>
+      <a href="#/">Home</a>
+      <a href="#/about">About</a>
+      <a href="#/products">Products</a>
+      <a href="#/products/detail">Product detail</a>
+    </nav>
+    <div id="hash-path-content">
+      <p><em>Loading...</em></p>
+    </div>
+    """
+    script = """
+<script>
+  const routes = {
+    "/":                "<h2>Home</h2><p>Hash-path router home. The full URL is <code>/hash-path-router#/</code>.</p>",
+    "/about":           "<h2>About</h2><p>Hash-path router about page. Full URL: <code>/hash-path-router#/about</code>. This content only exists in the DOM after JavaScript runs.</p>",
+    "/products":        "<h2>Products</h2><p>Hash-path router products list. Full URL: <code>/hash-path-router#/products</code>.</p><p><a href='#/products/detail'>View product detail</a></p>",
+    "/products/detail": "<h2>Product detail</h2><p>Hash-path router nested route. Full URL: <code>/hash-path-router#/products/detail</code>. This is two levels deep inside the hash path.</p>",
+  };
+
+  function renderRoute() {
+    const hashPath = window.location.hash.replace(/^#/, "") || "/";
+    document.getElementById("hash-path-content").innerHTML =
+      routes[hashPath] || "<p>Unknown hash route: <code>" + hashPath + "</code>.</p>";
+  }
+
+  window.addEventListener("hashchange", renderRoute);
+  renderRoute();
+</script>"""
+    return html_page("Hash-path router (Angular / Vue hash mode style)", body, script=script)
+
+
+@app.get("/hash-drawer", response_class=HTMLResponse)
+async def hash_drawer():
+    body = """
+    <p>This page uses a hash-drawer pattern. The base page content is always fully visible;
+       the hash triggers a slide-in drawer panel on top of it. This is different from a full
+       SPA hash route — the page is not replaced, only augmented. URLs look like
+       <code>/hash-drawer#/_drawer/ai/aicopilot/</code>. A crawler must decide whether to
+       treat the drawer URL as a separate page from the base URL, and whether the drawer
+       content (JS-rendered) is discoverable at all.</p>
+    <article>
+      <h2>Base page content</h2>
+      <p>This content is always present in the DOM regardless of the hash. The drawer appears
+         on top of this when a <code>#/_drawer/</code> hash is active.</p>
+      <ul>
+        <li><a href="#/_drawer/ai/aicopilot/">Open AI Copilot drawer</a></li>
+        <li><a href="#/_drawer/settings/profile/">Open Settings drawer</a></li>
+        <li><a href="#/_drawer/help/">Open Help drawer</a></li>
+      </ul>
+    </article>
+    <div id="drawer-overlay" style="display:none; position:fixed; top:0; right:0; width:360px;
+         height:100%; background:#fff; box-shadow:-4px 0 16px rgba(0,0,0,.2);
+         padding:1.5rem; overflow-y:auto; z-index:100;">
+      <button id="drawer-close"><a href="#">&#x2715; Close drawer</a></button>
+      <div id="drawer-content"></div>
+    </div>
+    """
+    script = """
+<script>
+  const drawerRoutes = {
+    "/_drawer/ai/aicopilot/":      "<h2>AI Copilot</h2><p>This is the AI Copilot drawer. It opens on top of the base page when the URL hash is <code>#/_drawer/ai/aicopilot/</code>. A crawler that follows this hash link would need to execute JavaScript to see this content.</p><p><a href='#/_drawer/settings/profile/'>Go to Settings drawer</a></p>",
+    "/_drawer/settings/profile/":  "<h2>Settings — Profile</h2><p>This is the Settings Profile drawer. Full URL: <code>/hash-drawer#/_drawer/settings/profile/</code>. The base page content remains visible behind this drawer.</p><p><a href='#/_drawer/help/'>Go to Help drawer</a></p>",
+    "/_drawer/help/":              "<h2>Help</h2><p>This is the Help drawer. Full URL: <code>/hash-drawer#/_drawer/help/</code>. Closing the drawer returns to <code>/hash-drawer</code> with no hash.</p>",
+  };
+
+  const overlay = document.getElementById("drawer-overlay");
+  const content = document.getElementById("drawer-content");
+
+  function renderDrawer() {
+    const hash = window.location.hash;
+    if (hash.startsWith("#/_drawer/")) {
+      const route = hash.slice(1);
+      content.innerHTML = drawerRoutes[route] || "<p>Unknown drawer: <code>" + route + "</code>.</p>";
+      overlay.style.display = "block";
+    } else {
+      overlay.style.display = "none";
+      content.innerHTML = "";
+    }
+  }
+
+  window.addEventListener("hashchange", renderDrawer);
+  renderDrawer();
+</script>"""
+    return html_page("Hash drawer pattern", body, script=script)
+
+
+@app.get("/hash-query-combo", response_class=HTMLResponse)
+async def hash_query_combo(q: str = ""):
+    query_display = escape(q) if q else "<em>No query entered.</em>"
+    body = f"""
+    <p>This page combines a query string with a hash fragment. The full URL looks like
+       <code>/hash-query-combo?q=test#results</code>. The <code>?q=</code> parameter is
+       processed server-side; the <code>#results</code> fragment scrolls the page to the
+       results section. A crawler must parse <code>?</code> before <code>#</code> to correctly
+       extract the query parameters — if it treats everything after <code>#</code> as the
+       fragment, it will miss <code>?q=test</code>; if it treats <code>#results</code> as part
+       of the query string, it will send a malformed request.</p>
+    <form action="/hash-query-combo" method="get">
+      <input name="q" value="{escape(q, quote=True)}" placeholder="Enter a search query" />
+      <button type="submit">Search</button>
+    </form>
+    <section id="results">
+      <h2>Results</h2>
+      <p>Query: {query_display}</p>
+    </section>
+    """
+    return html_page("Query string + hash fragment combo", body)
+
+
+@app.get("/hashbang-router", response_class=HTMLResponse)
+async def hashbang_router():
+    body = """
+    <p>This page uses the <code>#!</code> hashbang pattern. This was the mechanism Google
+       recommended (2009–2015) for making AJAX-rendered content crawlable: when Googlebot
+       encountered <code>#!/route</code> it would instead fetch
+       <code>?_escaped_fragment_=/route</code> from the server. Some crawlers still recognise
+       <code>#!</code> as a special signal; others treat it like any other hash fragment.</p>
+    <nav>
+      <a href="#!/home">Home</a>
+      <a href="#!/about">About</a>
+      <a href="#!/contact">Contact</a>
+    </nav>
+    <div id="hashbang-content">
+      <p><em>Loading...</em></p>
+    </div>
+    """
+    script = """
+<script>
+  const routes = {
+    "home":    "<h2>Home</h2><p>Hashbang home route. Full URL: <code>/hashbang-router#!/home</code>. A crawler that rewrites <code>#!</code> to <code>?_escaped_fragment_=</code> would request <code>/hashbang-router?_escaped_fragment_=home</code> instead.</p>",
+    "about":   "<h2>About</h2><p>Hashbang about route. Full URL: <code>/hashbang-router#!/about</code>. Content is only visible after JavaScript executes.</p>",
+    "contact": "<h2>Contact</h2><p>Hashbang contact route. Full URL: <code>/hashbang-router#!/contact</code>.</p>",
+  };
+
+  function renderRoute() {
+    const hash = window.location.hash;
+    const route = hash.startsWith("#!") ? hash.slice(2) : "home";
+    document.getElementById("hashbang-content").innerHTML =
+      routes[route] || "<p>Unknown route: <code>" + route + "</code>.</p>";
+  }
+
+  window.addEventListener("hashchange", renderRoute);
+  renderRoute();
+</script>"""
+    return html_page("Hashbang router (#! pattern)", body, script=script)
+
+
+@app.get("/percent-encoded-hash", response_class=HTMLResponse)
+async def percent_encoded_hash():
+    body = """
+    <p>This page demonstrates the difference between <code>#</code> (a fragment delimiter, never
+       sent to the server) and <code>%23</code> (a percent-encoded literal hash character that
+       <em>is</em> part of the path or query string sent to the server). They look similar in a
+       URL but are entirely different things.</p>
+    <ul>
+      <li>
+        <a href="#real-anchor">Fragment link: <code>#real-anchor</code></a> —
+        browser scrolls to the section below; server only sees a request for
+        <code>/percent-encoded-hash</code>.
+      </li>
+      <li>
+        <a href="/percent-encoded-hash%23real-anchor">Encoded-hash link: <code>/percent-encoded-hash%23real-anchor</code></a> —
+        server receives a request for the path <code>/percent-encoded-hash%23real-anchor</code>
+        (a different URL entirely), which returns 404. A crawler that strips <code>%23</code>
+        as if it were a fragment delimiter would incorrectly record a 200 instead.
+      </li>
+      <li>
+        <a href="/query-page?ref=%23section">Query param with <code>%23</code>: <code>/query-page?ref=%23section</code></a> —
+        the <code>%23</code> decodes to a literal <code>#</code> in the query value, not a fragment.
+        The server receives <code>ref=#section</code> as a query parameter.
+      </li>
+    </ul>
+    <section id="real-anchor">
+      <h2>Real anchor section</h2>
+      <p>Reachable via the fragment <code>#real-anchor</code>. Always present in the HTML —
+         the hash only scrolls here and is never sent to the server.</p>
+    </section>
+    """
+    return html_page("Percent-encoded hash (%23) vs fragment (#)", body)
 
 
 @app.get("/files/sample.pdf")
