@@ -94,6 +94,20 @@ TEST_SECTIONS: List[Dict[str, Any]] = [
                 "home_links": [{"href": "/localhost-link", "label": "Localhost absolute links page"}],
             },
             {
+                "path": "/long-href",
+                "crawl_worthy": True,
+                "category": "long_href",
+                "href_length_gt": 2048,
+                "label": "Long href over 2048 characters",
+                "home_links": [{"href": "/long-href", "label": "Long href over 2048 characters"}],
+            },
+            {
+                "path": "/long-href-target",
+                "crawl_worthy": True,
+                "category": "long_href_target",
+                "label": "Long href target",
+            },
+            {
                 "path": "/legacy.php",
                 "crawl_worthy": True,
                 "category": "php_path",
@@ -526,6 +540,15 @@ TEST_SECTIONS: List[Dict[str, Any]] = [
                 "home_links": [{"href": "/slow", "label": "Slow page"}],
             },
             {
+                "path": "/transient-load",
+                "crawl_worthy": True,
+                "category": "transient_load",
+                "failure_count_before_success": 6,
+                "reset_path": "/transient-load/reset",
+                "label": "Transient load failure then success",
+                "home_links": [{"href": "/transient-load?key=homepage", "label": "Transient load failure then success"}],
+            },
+            {
                 "path": "/empty",
                 "crawl_worthy": True,
                 "category": "empty_200",
@@ -704,6 +727,14 @@ TEST_SECTIONS: List[Dict[str, Any]] = [
                 "label": "Sitemap-only page",
             },
             {
+                "path": "/sitemap-exclusive-edge-case",
+                "crawl_worthy": True,
+                "category": "sitemap_only_unique",
+                "discovery_method": "sitemap",
+                "html_linked": False,
+                "label": "Unique sitemap-only edge case page",
+            },
+            {
                 "path": "/sitemap-discovery-fail",
                 "crawl_worthy": True,
                 "category": "sitemap_discovery_failure",
@@ -715,6 +746,27 @@ TEST_SECTIONS: List[Dict[str, Any]] = [
             },
             {"path": "/robots.txt", "crawl_worthy": True, "category": "robots_txt", "label": "Robots.txt"},
             {"path": "/sitemap.xml", "crawl_worthy": True, "category": "sitemap_xml", "label": "Sitemap XML"},
+        ],
+    },
+    {
+        "id": "char-limit-tests",
+        "title": "Char Limit Tests",
+        "entries": [
+            {
+                "path": "/oversized-metadata",
+                "crawl_worthy": True,
+                "category": "char_limit_oversized_metadata",
+                "title_length_gt": 1024,
+                "mime_type_length_gt": 256,
+                "charset_length_gt": 256,
+                "label": "Oversized title, MIME type, and charset",
+                "home_links": [
+                    {
+                        "href": "/oversized-metadata",
+                        "label": "Oversized title, MIME type, and charset",
+                    }
+                ],
+            },
         ],
     },
     {

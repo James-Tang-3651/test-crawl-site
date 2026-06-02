@@ -128,6 +128,14 @@ LOAD_TEST_LOREM_PARAGRAPHS = [
     "Nulla facilisi. Ut fringilla, suspendisse potenti, nunc feugiat mi a tellus consequat imperdiet, vestibulum sapien proin quam.",
     "Etiam ultrices, suspendisse in justo eu magna luctus suscipit. Sed lectus, integer euismod lacus luctus magna, quisque cursus metus vitae pharetra auctor.",
 ]
+LONG_HREF_PAYLOAD = "long-url-segment-" + ("a" * 2100)
+LONG_HREF_PATH = f"/long-href-target?{urlencode({'payload': LONG_HREF_PAYLOAD})}"
+TRANSIENT_LOAD_FAILURES = 6
+transient_load_counts: dict[str, int] = {}
+OVERSIZED_TITLE = "Oversized Metadata Title " + ("T" * 1100)
+OVERSIZED_MIME_TYPE = "application/" + ("vnd.crawltest." * 22) + "html"
+OVERSIZED_CHARSET = "utf-" + ("crawltest-" * 32) + "8"
+OVERSIZED_CONTENT_TYPE = f"{OVERSIZED_MIME_TYPE}; charset={OVERSIZED_CHARSET}"
 
 VANCOUVER_TZ = ZoneInfo("America/Vancouver")
 DEFAULT_WEATHER_CITY = "vancouver"
@@ -1372,6 +1380,32 @@ async def redirect_target():
 async def slow():
     await asyncio.sleep(2.5)
     return html_page("Slow Page", '<p>Slow page finished after a delay.</p><a href="/query-page?ref=slow">Query from slow page</a>')
+
+
+@app.get("/transient-load")
+async def transient_load(key: str = "default"):
+    count = transient_load_counts.get(key, 0) + 1
+    transient_load_counts[key] = count
+
+    if count <= TRANSIENT_LOAD_FAILURES:
+        return PlainTextResponse(
+            f"Transient load attempt {count} failed. Attempt {TRANSIENT_LOAD_FAILURES + 1} will succeed.",
+            status_code=503,
+            headers={"Retry-After": "1"},
+        )
+
+    body = f"""
+    <p>Transient load succeeded for key <code>{escape(key)}</code> after {count} attempts.</p>
+    <p>This route simulates a site migration or update that fails temporarily before becoming crawlable.</p>
+    <a href="/about?from=transient-load">Stable child link after recovery</a>
+    """
+    return html_page("Transient Load Succeeded", body)
+
+
+@app.get("/transient-load/reset")
+async def transient_load_reset(key: str = "default"):
+    transient_load_counts.pop(key, None)
+    return JSONResponse({"key": key, "reset": True, "failure_count_before_success": TRANSIENT_LOAD_FAILURES})
 
 
 @app.get("/empty", response_class=HTMLResponse)
@@ -3224,6 +3258,15 @@ async def sitemap_only():
     return html_page("Sitemap Only Page", body)
 
 
+@app.get("/sitemap-exclusive-edge-case", response_class=HTMLResponse)
+async def sitemap_exclusive_edge_case():
+    body = """
+    <p>This unique page is intentionally discoverable only from sitemap output.</p>
+    <p>It is not linked from the homepage, redirects, robots.txt, iframes, base tag pages, or button flows.</p>
+    """
+    return html_page("Unique Sitemap-Only Edge Case", body)
+
+
 @app.get("/sitemap-discovery-fail", response_class=HTMLResponse)
 async def sitemap_discovery_fail():
     head = '<link rel="sitemap" type="application/xml" href="/sitemap-discovery-fail.xml" />'
@@ -3283,6 +3326,38 @@ async def localhost_link(request: Request):
     </ul>
     """
     return html_page("Localhost Links", body)
+
+
+@app.get("/long-href", response_class=HTMLResponse)
+async def long_href():
+    body = f"""
+    <p>This page contains an anchor whose href is longer than 2048 characters.</p>
+    <p>Measured href length: {len(LONG_HREF_PATH)} characters.</p>
+    <a id="long-href-link" href="{escape(LONG_HREF_PATH, quote=True)}">Long href target</a>
+    """
+    return html_page("Long href over 2048 characters", body)
+
+
+@app.get("/long-href-target", response_class=HTMLResponse)
+async def long_href_target(payload: str = ""):
+    body = f"""
+    <p>Long href target loaded successfully.</p>
+    <p>Payload length: {len(payload)} characters.</p>
+    <a href="/long-href">Back to long href source</a>
+    """
+    return html_page("Long href target", body)
+
+
+@app.get("/oversized-metadata")
+async def oversized_metadata():
+    body = """
+    <article>
+      <p>This page intentionally exceeds common database column lengths for title, MIME type, and charset.</p>
+      <p>The Content-Type header uses valid token syntax while exceeding 256 characters for both media type and charset.</p>
+    </article>
+    """
+    content = html_document(OVERSIZED_TITLE, body)
+    return Response(content=content, headers={"Content-Type": OVERSIZED_CONTENT_TYPE})
 
 
 @app.get("/wrong-content-type-html-as-text")

@@ -45,6 +45,9 @@ function wait(milliseconds) {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
+const transientLoadFailures = 6;
+const transientLoadCounts = new Map();
+
 const weatherImages = {
   sunny: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 160"><rect width="240" height="160" fill="#e7f5ff"/><circle cx="120" cy="78" r="34" fill="#ffd43b"/><g stroke="#f08c00" stroke-width="8" stroke-linecap="round"><path d="M120 18v18"/><path d="M120 120v18"/><path d="M60 78H42"/><path d="M198 78h-18"/><path d="m77 35 13 13"/><path d="m163 121-13-13"/><path d="m77 121 13-13"/><path d="m163 35-13 13"/></g></svg>',
   cloudy: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 160"><rect width="240" height="160" fill="#edf2ff"/><path fill="#adb5bd" d="M74 112c-21 0-38-15-38-34 0-18 15-32 34-34 10-21 32-34 57-34 34 0 62 24 65 55 16 5 27 18 27 34 0 19-17 34-38 34H74Z"/><path fill="#dee2e6" d="M66 124c-18 0-33-13-33-30 0-15 12-28 29-30 9-18 28-29 50-29 30 0 54 21 57 48 14 4 24 16 24 30 0 17-15 30-33 30H66Z"/></svg>',
@@ -247,6 +250,44 @@ async function slowPage() {
     "Slow Page",
     '<p>Slow page finished after a delay.</p><a href="/query-page?ref=slow">Query from slow page</a>',
   );
+}
+
+function transientLoadPage(url) {
+  const key = url.searchParams.get("key") || "default";
+  const count = (transientLoadCounts.get(key) || 0) + 1;
+  transientLoadCounts.set(key, count);
+
+  // Netlify may recycle function instances, so Render/FastAPI remains the
+  // authoritative host for deterministic transient-load testing.
+  if (count <= transientLoadFailures) {
+    return new Response(
+      `Transient load attempt ${count} failed. Attempt ${transientLoadFailures + 1} will succeed.`,
+      {
+        status: 503,
+        headers: {
+          "content-type": "text/plain; charset=utf-8",
+          "retry-after": "1",
+        },
+      },
+    );
+  }
+
+  return htmlResponse(
+    "Transient Load Succeeded",
+    `
+    <p>Transient load succeeded for key <code>${escapeHtml(key)}</code> after ${count} attempts.</p>
+    <p>This route simulates a site migration or update that fails temporarily before becoming crawlable.</p>
+    <a href="/about?from=transient-load">Stable child link after recovery</a>
+    `,
+  );
+}
+
+function transientLoadReset(url) {
+  const key = url.searchParams.get("key") || "default";
+  transientLoadCounts.delete(key);
+  return new Response(JSON.stringify({key, reset: true, failure_count_before_success: transientLoadFailures}), {
+    headers: {"content-type": "application/json; charset=utf-8"},
+  });
 }
 
 async function status504Page() {
@@ -476,6 +517,14 @@ export default async function handler(request) {
     return status504Page();
   }
 
+  if (url.pathname === "/transient-load") {
+    return transientLoadPage(url);
+  }
+
+  if (url.pathname === "/transient-load/reset") {
+    return transientLoadReset(url);
+  }
+
   if (url.pathname === "/weather/vancouver-daily-report") {
     return vancouverDailyWeatherReport();
   }
@@ -503,6 +552,8 @@ export const config = {
     "/redirect-middle",
     "/slow",
     "/status/504",
+    "/transient-load",
+    "/transient-load/reset",
     "/weather/vancouver-daily-report",
     "/weather/vancouver-daily-report/data.json",
     "/weather/vancouver-weekly-report",

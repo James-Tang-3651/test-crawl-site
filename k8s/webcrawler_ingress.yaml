@@ -1,0 +1,32 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: webcrawler-crawlservice
+  namespace: mq
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: 50m
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/use-regex: "true"
+spec:
+  tls:
+    - hosts:
+        - mqapi.testing.comm100dev.io
+        - mqdash.testing.comm100dev.io
+      secretName: testing.comm100dev.io-tls
+  rules:
+    - host: mqapi.testing.comm100dev.io
+      http:
+        paths:
+          - path: /webcrawler(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: webcrawler-crawlservice
+                port:
+                  number: 80

@@ -1,0 +1,58 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: migration-deploy-scripts
+  namespace: mq
+  labels:
+    app.kubernetes.io/name: migration-deploy-scripts
+    app.kubernetes.io/part-of: database-migration
+spec:
+  backoffLimit: 5
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: migration-deploy-scripts
+        app.kubernetes.io/part-of: database-migration
+    spec:
+      containers:
+        - name: migration-deploy-scripts
+          image: images.comm100dev.io/x2/migrator/test-van200:2026-06-02-02-41-87a3b690
+          command:
+            - dotnet
+            - DatabaseAutomation.dll
+            - MigrateDownAndUp
+            - --downVersion
+            - "20260603005"
+            - --upVersion
+            - "20260603005"
+          env:
+            - name: ConnectionStrings_Configuration
+              value: "Server=192.168.8.189,1433;User=wandbuser;Password=Sklafd!6asw29;TrustServerCertificate=true;"
+            - name: ConnectionStrings_Center
+              value: "Server=192.168.8.189,1433;User=wandbuser;Password=Sklafd!6asw29;TrustServerCertificate=true;"
+            - name: ConnectionStrings_Reporting
+              value: "Server=192.168.8.189,1533;User=wandbuser;Password=Sklafd!6asw29;TrustServerCertificate=true;"
+            - name: Encrypt_Provider
+              value: aes
+            - name: DeploymentName
+              value: mq
+          resources: {}
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          imagePullPolicy: Always
+      restartPolicy: Never
+      terminationGracePeriodSeconds: 30
+      dnsPolicy: ClusterFirst
+      securityContext: {}
+      imagePullSecrets:
+        - name: comm100-harbor
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: resource
+                    operator: In
+                    values:
+                      - application
+      schedulerName: default-scheduler

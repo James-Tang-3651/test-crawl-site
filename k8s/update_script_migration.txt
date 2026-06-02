@@ -1,0 +1,167 @@
+kind: Job
+apiVersion: batch/v1
+metadata:
+  name: migration-deploy-scripts
+  namespace: van200
+  uid: 35727cdb-59a0-46a5-90bb-1a9aea3035c0
+  resourceVersion: '1465021307'
+  generation: 1
+  creationTimestamp: '2026-05-23T01:06:15Z'
+  labels:
+    controller-uid: 35727cdb-59a0-46a5-90bb-1a9aea3035c0
+    job-name: migration-deploy-scripts
+  annotations:
+    batch.kubernetes.io/job-tracking: ''
+    kubectl.kubernetes.io/last-applied-configuration: >
+      {"apiVersion":"batch/v1","kind":"Job","metadata":{"annotations":{},"name":"migration-deploy-scripts","namespace":"van200"},"spec":{"backoffLimit":5,"template":{"spec":{"affinity":{"nodeAffinity":{"requiredDuringSchedulingIgnoredDuringExecution":{"nodeSelectorTerms":[{"matchExpressions":[{"key":"resource","operator":"In","values":["application"]}]}]}}},"containers":[{"command":["dotnet","DatabaseAutomation.dll","MigrateDownAndUp","--downVersion","20260514000","--upVersion","20260603003"],"env":[{"name":"ConnectionStrings_Configuration","value":"Server=192.168.8.189,1433;User=wandbuser;Password=Sklafd!6asw29;TrustServerCertificate=true;"},{"name":"ConnectionStrings_Center","value":"Server=192.168.8.189,1433;User=wandbuser;Password=Sklafd!6asw29;TrustServerCertificate=true;"},{"name":"ConnectionStrings_Reporting","value":"Server=192.168.8.189,1533;User=wandbuser;Password=Sklafd!6asw29;TrustServerCertificate=true;"},{"name":"Encrypt_Provider","value":"aes"},{"name":"DeploymentName","value":"van200"}],"image":"images.comm100dev.io/x2/migrator/test-van200:2026-05-23-00-55-25205b84","imagePullPolicy":"Always","name":"migration-deploy-scripts"}],"imagePullSecrets":[{"name":"comm100-harbor"}],"restartPolicy":"Never"}}}}
+  managedFields:
+    - manager: kubectl
+      operation: Update
+      apiVersion: batch/v1
+      time: '2026-05-23T01:06:15Z'
+      fieldsType: FieldsV1
+      fieldsV1:
+        f:metadata:
+          f:annotations:
+            .: {}
+            f:kubectl.kubernetes.io/last-applied-configuration: {}
+        f:spec:
+          f:backoffLimit: {}
+          f:completionMode: {}
+          f:completions: {}
+          f:parallelism: {}
+          f:suspend: {}
+          f:template:
+            f:spec:
+              f:affinity:
+                .: {}
+                f:nodeAffinity:
+                  .: {}
+                  f:requiredDuringSchedulingIgnoredDuringExecution: {}
+              f:containers:
+                k:{"name":"migration-deploy-scripts"}:
+                  .: {}
+                  f:command: {}
+                  f:env:
+                    .: {}
+                    k:{"name":"ConnectionStrings_Center"}:
+                      .: {}
+                      f:name: {}
+                      f:value: {}
+                    k:{"name":"ConnectionStrings_Configuration"}:
+                      .: {}
+                      f:name: {}
+                      f:value: {}
+                    k:{"name":"ConnectionStrings_Reporting"}:
+                      .: {}
+                      f:name: {}
+                      f:value: {}
+                    k:{"name":"DeploymentName"}:
+                      .: {}
+                      f:name: {}
+                      f:value: {}
+                    k:{"name":"Encrypt_Provider"}:
+                      .: {}
+                      f:name: {}
+                      f:value: {}
+                  f:image: {}
+                  f:imagePullPolicy: {}
+                  f:name: {}
+                  f:resources: {}
+                  f:terminationMessagePath: {}
+                  f:terminationMessagePolicy: {}
+              f:dnsPolicy: {}
+              f:imagePullSecrets:
+                .: {}
+                k:{"name":"comm100-harbor"}: {}
+              f:restartPolicy: {}
+              f:schedulerName: {}
+              f:securityContext: {}
+              f:terminationGracePeriodSeconds: {}
+    - manager: kube-controller-manager
+      operation: Update
+      apiVersion: batch/v1
+      time: '2026-05-23T01:10:53Z'
+      fieldsType: FieldsV1
+      fieldsV1:
+        f:status:
+          f:completionTime: {}
+          f:conditions: {}
+          f:ready: {}
+          f:startTime: {}
+          f:succeeded: {}
+          f:uncountedTerminatedPods: {}
+      subresource: status
+spec:
+  parallelism: 1
+  completions: 1
+  backoffLimit: 5
+  selector:
+    matchLabels:
+      controller-uid: 35727cdb-59a0-46a5-90bb-1a9aea3035c0
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        controller-uid: 35727cdb-59a0-46a5-90bb-1a9aea3035c0
+        job-name: migration-deploy-scripts
+    spec:
+      containers:
+        - name: migration-deploy-scripts
+          image: >-
+            images.comm100dev.io/x2/migrator/test-van200:2026-05-23-00-55-25205b84
+          command:
+            - dotnet
+            - DatabaseAutomation.dll
+            - MigrateDownAndUp
+            - '--downVersion'
+            - '20260514000'
+            - '--upVersion'
+            - '20260603003'
+          env:
+            - name: ConnectionStrings_Configuration
+              value: >-
+                Server=192.168.8.189,1433;User=wandbuser;Password=Sklafd!6asw29;TrustServerCertificate=true;
+            - name: ConnectionStrings_Center
+              value: >-
+                Server=192.168.8.189,1433;User=wandbuser;Password=Sklafd!6asw29;TrustServerCertificate=true;
+            - name: ConnectionStrings_Reporting
+              value: >-
+                Server=192.168.8.189,1533;User=wandbuser;Password=Sklafd!6asw29;TrustServerCertificate=true;
+            - name: Encrypt_Provider
+              value: aes
+            - name: DeploymentName
+              value: van200
+          resources: {}
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          imagePullPolicy: Always
+      restartPolicy: Never
+      terminationGracePeriodSeconds: 30
+      dnsPolicy: ClusterFirst
+      securityContext: {}
+      imagePullSecrets:
+        - name: comm100-harbor
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: resource
+                    operator: In
+                    values:
+                      - application
+      schedulerName: default-scheduler
+  completionMode: NonIndexed
+  suspend: false
+status:
+  conditions:
+    - type: Complete
+      status: 'True'
+      lastProbeTime: '2026-05-23T01:10:53Z'
+      lastTransitionTime: '2026-05-23T01:10:53Z'
+  startTime: '2026-05-23T01:10:39Z'
+  completionTime: '2026-05-23T01:10:52Z'
+  succeeded: 1
+  uncountedTerminatedPods: {}
+  ready: 0
