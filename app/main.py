@@ -132,10 +132,9 @@ LONG_HREF_PAYLOAD = "long-url-segment-" + ("a" * 2100)
 LONG_HREF_PATH = f"/long-href-target?{urlencode({'payload': LONG_HREF_PAYLOAD})}"
 TRANSIENT_LOAD_FAILURES = 6
 transient_load_counts: dict[str, int] = {}
-OVERSIZED_TITLE = "Oversized Metadata Title " + ("T" * 1100)
+OVERSIZED_TITLE = "Oversized Title " + ("T" * 1100)
 OVERSIZED_MIME_TYPE = "application/" + ("vnd.crawltest." * 22) + "html"
 OVERSIZED_CHARSET = "utf-" + ("crawltest-" * 32) + "8"
-OVERSIZED_CONTENT_TYPE = f"{OVERSIZED_MIME_TYPE}; charset={OVERSIZED_CHARSET}"
 
 VANCOUVER_TZ = ZoneInfo("America/Vancouver")
 DEFAULT_WEATHER_CITY = "vancouver"
@@ -3348,16 +3347,39 @@ async def long_href_target(payload: str = ""):
     return html_page("Long href target", body)
 
 
-@app.get("/oversized-metadata")
-async def oversized_metadata():
+@app.get("/oversized-title", response_class=HTMLResponse)
+async def oversized_title():
     body = """
     <article>
-      <p>This page intentionally exceeds common database column lengths for title, MIME type, and charset.</p>
-      <p>The Content-Type header uses valid token syntax while exceeding 256 characters for both media type and charset.</p>
+      <p>This page intentionally has an HTML title longer than 1024 characters.</p>
+      <p>The response uses a normal text/html content type so browsers open it as a page.</p>
     </article>
     """
-    content = html_document(OVERSIZED_TITLE, body)
-    return Response(content=content, headers={"Content-Type": OVERSIZED_CONTENT_TYPE})
+    return HTMLResponse(html_document(OVERSIZED_TITLE, body))
+
+
+@app.get("/oversized-charset")
+async def oversized_charset():
+    body = """
+    <article>
+      <p>This page intentionally has a charset value longer than 256 characters.</p>
+      <p>The media type remains text/html so browsers should still open it as a page.</p>
+    </article>
+    """
+    content = html_document("Oversized charset", body)
+    return Response(content=content, headers={"Content-Type": f"text/html; charset={OVERSIZED_CHARSET}"})
+
+
+@app.get("/oversized-mime-type")
+async def oversized_mime_type():
+    body = """
+    <article>
+      <p>This response intentionally has a MIME type longer than 256 characters.</p>
+      <p>Browsers may download this response because the media type is intentionally unknown.</p>
+    </article>
+    """
+    content = html_document("Oversized MIME type", body)
+    return Response(content=content, headers={"Content-Type": f"{OVERSIZED_MIME_TYPE}; charset=utf-8"})
 
 
 @app.get("/wrong-content-type-html-as-text")

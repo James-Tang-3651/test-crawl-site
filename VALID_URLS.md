@@ -9,7 +9,7 @@ Notes:
 - The route-only section lists valid app endpoints that are not unique manifest content pages, including JSON endpoints, server-only fragments, redirect aliases, sitemap files, robots-blocked targets, and downloadable/media assets.
 - Status-code test endpoints such as `/status/404` are valid test routes even though they intentionally return non-2xx responses.
 
-## Manifest URLs (206)
+## Manifest URLs (208)
 
 ### Core URL Handling (15)
 
@@ -100,9 +100,11 @@ Notes:
 - `/robots.txt` - Robots.txt
 - `/sitemap.xml` - Sitemap XML
 
-### Char Limit Tests (1)
+### Char Limit Tests (3)
 
-- `/oversized-metadata` - Oversized title, MIME type, and charset
+- `/oversized-title` - Oversized title
+- `/oversized-charset` - Oversized charset
+- `/oversized-mime-type` - Oversized MIME type
 
 ### weather daily update changeFrequency (1)
 
