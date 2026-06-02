@@ -130,7 +130,7 @@ LOAD_TEST_LOREM_PARAGRAPHS = [
 ]
 LONG_HREF_PAYLOAD = "long-url-segment-" + ("a" * 2100)
 LONG_HREF_PATH = f"/long-href-target?{urlencode({'payload': LONG_HREF_PAYLOAD})}"
-TRANSIENT_LOAD_FAILURES = 6
+TRANSIENT_LOAD_FAILURES = 5
 transient_load_counts: dict[str, int] = {}
 OVERSIZED_TITLE = "Oversized Title " + ("T" * 1100)
 OVERSIZED_MIME_TYPE = "application/" + ("vnd.crawltest." * 22) + "html"
@@ -1396,9 +1396,18 @@ async def transient_load(key: str = "default"):
     body = f"""
     <p>Transient load succeeded for key <code>{escape(key)}</code> after {count} attempts.</p>
     <p>This route simulates a site migration or update that fails temporarily before becoming crawlable.</p>
-    <a href="/about?from=transient-load">Stable child link after recovery</a>
+    <a href="/transient-load-child">Transient load child page</a>
     """
     return html_page("Transient Load Succeeded", body)
+
+
+@app.get("/transient-load-child", response_class=HTMLResponse)
+async def transient_load_child():
+    body = """
+    <p>This child page is only linked from the recovered transient-load page.</p>
+    <p>It stays within the transient-load test flow instead of redirecting crawlers back to the main About page.</p>
+    """
+    return html_page("Transient Load Child Page", body)
 
 
 @app.get("/transient-load/reset")
