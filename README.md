@@ -114,7 +114,9 @@ these routes:
 - `/status/500`
 - `/status/504`
 - `/long-href`
-- `/oversized-metadata`
+- `/oversized-title`
+- `/oversized-charset`
+- `/oversized-mime-type`
 - `/sitemap-exclusive-edge-case`
 - `/transient-load/reset?key=readme`
 - `/transient-load?key=readme`
@@ -134,7 +136,9 @@ crawler-facing behavior should match Netlify.
 - `/long-href` page with an href longer than 2048 characters
 - `/transient-load?key=<run-id>` page that returns 503 for six requests, then 200
 - `/transient-load/reset?key=<run-id>` reset endpoint for transient load tests
-- `/oversized-metadata` char-limit page for title, MIME type, and charset
+- `/oversized-title` char-limit page for title values longer than 1024 characters
+- `/oversized-charset` char-limit page for charset values longer than 256 characters
+- `/oversized-mime-type` char-limit response for MIME type values longer than 256 characters
 - `/sitemap-exclusive-edge-case` unique page discoverable only from sitemap output
 - `/files/sample.pdf` sample file link
 - `/media/pixel.jpg` sample image link

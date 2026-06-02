@@ -753,19 +753,29 @@ TEST_SECTIONS: List[Dict[str, Any]] = [
         "title": "Char Limit Tests",
         "entries": [
             {
-                "path": "/oversized-metadata",
+                "path": "/oversized-title",
                 "crawl_worthy": True,
-                "category": "char_limit_oversized_metadata",
+                "category": "char_limit_oversized_title",
                 "title_length_gt": 1024,
-                "mime_type_length_gt": 256,
+                "label": "Oversized title",
+                "home_links": [{"href": "/oversized-title", "label": "Oversized title"}],
+            },
+            {
+                "path": "/oversized-charset",
+                "crawl_worthy": True,
+                "category": "char_limit_oversized_charset",
                 "charset_length_gt": 256,
-                "label": "Oversized title, MIME type, and charset",
-                "home_links": [
-                    {
-                        "href": "/oversized-metadata",
-                        "label": "Oversized title, MIME type, and charset",
-                    }
-                ],
+                "label": "Oversized charset",
+                "home_links": [{"href": "/oversized-charset", "label": "Oversized charset"}],
+            },
+            {
+                "path": "/oversized-mime-type",
+                "crawl_worthy": True,
+                "category": "char_limit_oversized_mime_type",
+                "mime_type_length_gt": 256,
+                "may_download_in_browser": True,
+                "label": "Oversized MIME type",
+                "home_links": [{"href": "/oversized-mime-type", "label": "Oversized MIME type"}],
             },
         ],
     },
