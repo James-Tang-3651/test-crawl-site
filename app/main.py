@@ -1432,6 +1432,8 @@ async def transient_load(key: str = "default"):
 
     body = f"""
     <p>Transient load succeeded for key <code>{escape(key)}</code> after {count} attempts.</p>
+    <p>Retry count: {count - TRANSIENT_LOAD_FAILURES - 1}, you may access this properly now.</p>
+    <p>Failed access count before success: {TRANSIENT_LOAD_FAILURES}.</p>
     <p>This route simulates a site migration or update that fails temporarily before becoming crawlable.</p>
     <a href="/transient-load-child">Transient load child page</a>
     """

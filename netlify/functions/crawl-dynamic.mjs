@@ -276,6 +276,8 @@ function transientLoadPage(url) {
     "Transient Load Succeeded",
     `
     <p>Transient load succeeded for key <code>${escapeHtml(key)}</code> after ${count} attempts.</p>
+    <p>Retry count: ${count - transientLoadFailures - 1}, you may access this properly now.</p>
+    <p>Failed access count before success: ${transientLoadFailures}.</p>
     <p>This route simulates a site migration or update that fails temporarily before becoming crawlable.</p>
     <a href="/transient-load-child">Transient load child page</a>
     `,
