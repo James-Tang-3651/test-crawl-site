@@ -292,6 +292,21 @@ function transientLoadReset(url) {
   });
 }
 
+function transientLoadStatus(url) {
+  const key = url.searchParams.get("key") || "default";
+  const count = transientLoadCounts.get(key) || 0;
+  return new Response(JSON.stringify({
+    key,
+    access_count: count,
+    failed_access_count: Math.min(count, transientLoadFailures),
+    failure_count_before_success: transientLoadFailures,
+    retry_count: Math.max(0, count - transientLoadFailures - 1),
+    can_access_now: count >= transientLoadFailures,
+  }), {
+    headers: {"content-type": "application/json; charset=utf-8"},
+  });
+}
+
 async function status504Page() {
   return new Response("Gateway timeout test page", {
     status: 504,
@@ -527,6 +542,10 @@ export default async function handler(request) {
     return transientLoadReset(url);
   }
 
+  if (url.pathname === "/transient-load/status") {
+    return transientLoadStatus(url);
+  }
+
   if (url.pathname === "/weather/vancouver-daily-report") {
     return vancouverDailyWeatherReport();
   }
@@ -556,6 +575,7 @@ export const config = {
     "/status/504",
     "/transient-load",
     "/transient-load/reset",
+    "/transient-load/status",
     "/weather/vancouver-daily-report",
     "/weather/vancouver-daily-report/data.json",
     "/weather/vancouver-weekly-report",

@@ -553,6 +553,7 @@ TEST_SECTIONS: List[Dict[str, Any]] = [
                         "actions": [
                             {
                                 "href": "/transient-load/reset?key=homepage",
+                                "status_href": "/transient-load/status?key=homepage",
                                 "label": "Reset homepage transient key",
                             }
                         ],
