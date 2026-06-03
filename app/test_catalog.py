@@ -546,7 +546,18 @@ TEST_SECTIONS: List[Dict[str, Any]] = [
                 "failure_count_before_success": 5,
                 "reset_path": "/transient-load/reset",
                 "label": "Transient load failure then success",
-                "home_links": [{"href": "/transient-load?key=homepage", "label": "Transient load failure then success"}],
+                "home_links": [
+                    {
+                        "href": "/transient-load?key=homepage",
+                        "label": "Transient load failure then success",
+                        "actions": [
+                            {
+                                "href": "/transient-load/reset?key=homepage",
+                                "label": "Reset homepage transient key",
+                            }
+                        ],
+                    }
+                ],
             },
             {
                 "path": "/transient-load-child",

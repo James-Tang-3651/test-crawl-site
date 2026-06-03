@@ -134,7 +134,7 @@ crawler-facing behavior should match Netlify.
 - `/` root page with mixed links
 - `/_manifest` machine-readable page inventory
 - `/long-href` page with an href longer than 2048 characters
-- `/transient-load?key=<run-id>` page that returns 503 for six requests, then 200
+- `/transient-load?key=<run-id>` page that returns 503 for five requests, then 200
 - `/transient-load/reset?key=<run-id>` reset endpoint for transient load tests
 - `/oversized-title` char-limit page for title values longer than 1024 characters
 - `/oversized-charset` char-limit page for charset values longer than 256 characters

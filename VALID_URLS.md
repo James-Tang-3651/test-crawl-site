@@ -9,7 +9,7 @@ Notes:
 - The route-only section lists valid app endpoints that are not unique manifest content pages, including JSON endpoints, server-only fragments, redirect aliases, sitemap files, robots-blocked targets, and downloadable/media assets.
 - Status-code test endpoints such as `/status/404` are valid test routes even though they intentionally return non-2xx responses.
 
-## Manifest URLs (208)
+## Manifest URLs (209)
 
 ### Core URL Handling (15)
 
@@ -69,11 +69,12 @@ Notes:
 - `/security/bad-links` - XSS Bad Link payloads
 - `/security/clean-controls` - Security clean control cases
 
-### Errors and Status (12)
+### Errors and Status (13)
 
 - `/broken` - Broken HTML
 - `/slow` - Slow page
 - `/transient-load` - Transient load failure then success
+- `/transient-load-child` - Transient load child page
 - `/empty` - Empty 200 page
 - `/soft-error` - Soft error page
 - `/status/403` - 403 page
