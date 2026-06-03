@@ -63,6 +63,20 @@ TEST_SECTIONS: List[Dict[str, Any]] = [
                 "home_links": [{"href": "/casepage", "label": "Lowercase path"}],
             },
             {
+                "path": "/SameContent",
+                "crawl_worthy": True,
+                "category": "case_sensitive_same_content",
+                "label": "Uppercase path same content",
+                "home_links": [{"href": "/SameContent", "label": "Uppercase path same content"}],
+            },
+            {
+                "path": "/samecontent",
+                "crawl_worthy": True,
+                "category": "case_sensitive_same_content",
+                "label": "Lowercase path same content",
+                "home_links": [{"href": "/samecontent", "label": "Lowercase path same content"}],
+            },
+            {
                 "path": "/base-tag",
                 "crawl_worthy": True,
                 "category": "base_tag",

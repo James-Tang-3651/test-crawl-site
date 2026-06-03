@@ -9,9 +9,9 @@ Notes:
 - The route-only section lists valid app endpoints that are not unique manifest content pages, including JSON endpoints, server-only fragments, redirect aliases, sitemap files, robots-blocked targets, and downloadable/media assets.
 - Status-code test endpoints such as `/status/404` are valid test routes even though they intentionally return non-2xx responses.
 
-## Manifest URLs (209)
+## Manifest URLs (211)
 
-### Core URL Handling (15)
+### Core URL Handling (17)
 
 - `/` - Root page
 - `/about` - Relative About
@@ -21,6 +21,8 @@ Notes:
 - `/docs/` - Docs with slash
 - `/CasePage` - Uppercase path
 - `/casepage` - Lowercase path
+- `/SameContent` - Uppercase path same content
+- `/samecontent` - Lowercase path same content
 - `/base-tag` - Base tag page
 - `/docs/child-from-base` - Base tag child page
 - `/query-page` - Query variants

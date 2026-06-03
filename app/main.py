@@ -1313,6 +1313,19 @@ async def case_lower():
     return html_page("Case Lower", "<p>Lowercase path page.</p>")
 
 
+CASE_SAME_CONTENT_BODY = "<p>Case-sensitive duplicate content page.</p>"
+
+
+@app.get("/SameContent", response_class=HTMLResponse)
+async def same_content_upper():
+    return html_page("Same Content", CASE_SAME_CONTENT_BODY)
+
+
+@app.get("/samecontent", response_class=HTMLResponse)
+async def same_content_lower():
+    return html_page("Same Content", CASE_SAME_CONTENT_BODY)
+
+
 @app.get("/broken", response_class=HTMLResponse)
 async def broken():
     return HTMLResponse(
