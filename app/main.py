@@ -512,13 +512,27 @@ def homepage_anchor(link: dict, request: Request) -> str:
     return f"<a{html_attributes(attributes)}>{escape(link['label'])}</a>"
 
 
+def homepage_action(action: dict, request: Request) -> str:
+    href = homepage_href(action["href"], request)
+    label = escape(action["label"])
+    return (
+        f'<button type="button" data-reset-url="{escape(href, quote=True)}" '
+        f'style="margin-left:.5rem;">{label}</button>'
+    )
+
+
+def homepage_link_item(link: dict, request: Request) -> str:
+    actions = "".join(homepage_action(action, request) for action in link.get("actions", []))
+    return f"      <li>{homepage_anchor(link, request)}{actions}</li>"
+
+
 def homepage_sections(request: Request) -> str:
     section_blocks = []
     for section in TEST_SECTIONS:
         link_items = []
         for entry in section["entries"]:
             for link in entry.get("home_links", []):
-                link_items.append(f"      <li>{homepage_anchor(link, request)}</li>")
+                link_items.append(homepage_link_item(link, request))
 
         if not link_items:
             continue
@@ -534,6 +548,29 @@ def homepage_sections(request: Request) -> str:
         )
 
     return "".join(section_blocks)
+
+
+def homepage_script() -> str:
+    return """
+<script>
+  document.querySelectorAll("[data-reset-url]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      button.disabled = true;
+      const originalText = button.textContent;
+      try {
+        const response = await fetch(button.dataset.resetUrl);
+        button.textContent = response.ok ? "Reset complete" : "Reset failed";
+      } catch {
+        button.textContent = "Reset failed";
+      } finally {
+        window.setTimeout(() => {
+          button.textContent = originalText;
+          button.disabled = false;
+        }, 1500);
+      }
+    });
+  });
+</script>"""
 
 
 SECURITY_TEST_GROUPS = {
@@ -1165,7 +1202,7 @@ async def index(request: Request):
     {homepage_sections(request)}
     <div id="local-anchor">Anchor target text</div>
     """
-    return html_page("Crawl Test Home", body)
+    return html_page("Crawl Test Home", body, script=homepage_script())
 
 
 @app.get("/security/{group_slug}", response_class=HTMLResponse)
