@@ -515,9 +515,21 @@ def homepage_anchor(link: dict, request: Request) -> str:
 def homepage_action(action: dict, request: Request) -> str:
     href = homepage_href(action["href"], request)
     label = escape(action["label"])
+    status_href = action.get("status_href")
+    status_attr = (
+        f' data-status-url="{escape(homepage_href(status_href, request), quote=True)}"'
+        if status_href
+        else ""
+    )
+    status_label = (
+        f'<span data-transient-status-for="{escape(href, quote=True)}" style="margin-left:.5rem;">Retry count: 0</span>'
+        if status_href
+        else ""
+    )
     return (
         f'<button type="button" data-reset-url="{escape(href, quote=True)}" '
-        f'style="margin-left:.5rem;">{label}</button>'
+        f'{status_attr} style="margin-left:.5rem;">{label}</button>'
+        f"{status_label}"
     )
 
 
@@ -553,13 +565,38 @@ def homepage_sections(request: Request) -> str:
 def homepage_script() -> str:
     return """
 <script>
+  function transientStatusText(payload) {
+    if (payload.can_access_now) {
+      return `Retry count: ${payload.retry_count}, you may access this properly now! Failed accesses: ${payload.failed_access_count}/${payload.failure_count_before_success}.`;
+    }
+    return `Retry count: ${payload.retry_count}. Failed accesses: ${payload.failed_access_count}/${payload.failure_count_before_success}.`;
+  }
+
+  async function updateTransientStatus(button) {
+    if (!button.dataset.statusUrl) {
+      return;
+    }
+    const status = document.querySelector(`[data-transient-status-for="${CSS.escape(button.dataset.resetUrl)}"]`);
+    if (!status) {
+      return;
+    }
+    try {
+      const response = await fetch(button.dataset.statusUrl);
+      status.textContent = transientStatusText(await response.json());
+    } catch {
+      status.textContent = "Retry count unavailable.";
+    }
+  }
+
   document.querySelectorAll("[data-reset-url]").forEach((button) => {
+    updateTransientStatus(button);
     button.addEventListener("click", async () => {
       button.disabled = true;
       const originalText = button.textContent;
       try {
         const response = await fetch(button.dataset.resetUrl);
         button.textContent = response.ok ? "Reset complete" : "Reset failed";
+        await updateTransientStatus(button);
       } catch {
         button.textContent = "Reset failed";
       } finally {
@@ -1447,6 +1484,21 @@ async def transient_load_child():
     <p>It stays within the transient-load test flow instead of redirecting crawlers back to the main About page.</p>
     """
     return html_page("Transient Load Child Page", body)
+
+
+@app.get("/transient-load/status")
+async def transient_load_status(key: str = "default"):
+    count = transient_load_counts.get(key, 0)
+    return JSONResponse(
+        {
+            "key": key,
+            "access_count": count,
+            "failed_access_count": min(count, TRANSIENT_LOAD_FAILURES),
+            "failure_count_before_success": TRANSIENT_LOAD_FAILURES,
+            "retry_count": max(0, count - TRANSIENT_LOAD_FAILURES - 1),
+            "can_access_now": count >= TRANSIENT_LOAD_FAILURES,
+        }
+    )
 
 
 @app.get("/transient-load/reset")

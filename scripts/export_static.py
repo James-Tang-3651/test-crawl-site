@@ -71,6 +71,7 @@ FUNCTION_PATHS = {
     "/status/504",
     "/transient-load",
     "/transient-load/reset",
+    "/transient-load/status",
     "/weather/vancouver-daily-report",
     "/weather/vancouver-daily-report/data.json",
     "/weather/vancouver-weekly-report",
