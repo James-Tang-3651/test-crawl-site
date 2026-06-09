@@ -1588,14 +1588,20 @@ async def editable_get():
     content = escape(_editable_page["content"])
     body = f"""
     <article style="max-width:720px">
-      <h1 id="edit-title" contenteditable="true" style="border-bottom:2px solid #1a56db;padding-bottom:4px;outline:none">{title}</h1>
-      <div id="edit-content" contenteditable="true"
-           style="border:1px solid #bbb;border-radius:3px;line-height:1.6;margin:16px 0;min-height:120px;outline:none;padding:12px">{content}</div>
-      <div style="display:flex;align-items:center;gap:12px">
+      <h1>{title}</h1>
+
+      <p id="preview" style="border-left:3px solid #1a56db;line-height:1.7;min-height:1.5em;padding:10px 14px;margin:0 0 20px">{content}</p>
+
+      <label for="edit-input" style="display:block;font-size:0.85rem;font-weight:600;margin-bottom:6px">Edit paragraph</label>
+      <textarea id="edit-input" rows="5"
+                style="border:1px solid #bbb;border-radius:3px;box-sizing:border-box;font-size:1rem;line-height:1.6;padding:10px;width:100%">{content}</textarea>
+
+      <div style="display:flex;align-items:center;gap:12px;margin-top:12px">
         <button onclick="savePage()"
                 style="background:#1a56db;border:none;border-radius:3px;color:#fff;cursor:pointer;padding:8px 18px">Save</button>
         <span id="save-status" style="font-size:0.9rem"></span>
       </div>
+
       <p style="color:#666;font-size:0.85rem;margin-top:24px">
         Content is stored in server memory and resets on restart.
         Saving via PUT requires the live server (Render); on static hosting the save will fail gracefully.
@@ -1603,16 +1609,22 @@ async def editable_get():
       <p><a href="/">Back to crawl test home</a></p>
     </article>
     <script>
+    const textarea = document.getElementById('edit-input');
+    const preview  = document.getElementById('preview');
+
+    textarea.addEventListener('input', () => {{
+      preview.textContent = textarea.value;
+    }});
+
     async function savePage() {{
-      const title = document.getElementById('edit-title').textContent;
-      const content = document.getElementById('edit-content').textContent;
+      const content = textarea.value;
       const statusEl = document.getElementById('save-status');
       statusEl.textContent = 'Saving…';
       try {{
         const res = await fetch('/editable', {{
           method: 'PUT',
           headers: {{ 'Content-Type': 'application/json' }},
-          body: JSON.stringify({{ title, content }}),
+          body: JSON.stringify({{ title: {json.dumps(_editable_page["title"])}, content }}),
         }});
         if (!res.ok) throw new Error('HTTP ' + res.status);
         const data = await res.json();
