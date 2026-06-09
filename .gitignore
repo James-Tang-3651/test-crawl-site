@@ -4,3 +4,6 @@ dist/
 __pycache__/
 *.py[cod]
 *.log
+CRAWL_REPORT_VALIDATION.*
+CrawlTask_*_PagesStatus*.csv
+crawl_report_validation_findings.*

@@ -47,6 +47,7 @@ EXTRA_PATHS = [
     "/server-only/tabs/toppings",
     "/server-only/tabs/links",
     "/product-pages/javascript-calculated/data.json",
+    "/product-pages/javascript-rendered-grid/data.json",
     "/product-pages/laptop-configurator/data.json",
     "/files/sample.pdf",
     "/files/sample.docx",
@@ -57,6 +58,8 @@ EXTRA_PATHS = [
     "/media/bank-card-svgrepo-com.svg",
     "/media/shrek-rizz-face.jpg",
     "/download/sample.zip",
+    "/editable",
+    "/security/bad-links/tabnabbing-target",
 ]
 
 # These routes need request-time behavior that cannot be faithfully represented
