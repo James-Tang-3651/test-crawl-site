@@ -446,6 +446,13 @@ TEST_SECTIONS: List[Dict[str, Any]] = [
                 "label": "JavaScript created links page",
                 "home_links": [{"href": "/javascript-created-links", "label": "JavaScript created links page"}],
             },
+            {
+                "path": "/editable",
+                "crawl_worthy": True,
+                "category": "editable_page",
+                "label": "Inline-editable PUT page",
+                "home_links": [{"href": "/editable", "label": "Editable Page (PUT)"}],
+            },
         ],
     },
     {
@@ -522,7 +529,30 @@ TEST_SECTIONS: List[Dict[str, Any]] = [
                 "security_group": "bad-links",
                 "payloads_are_escaped": True,
                 "label": "XSS Bad Link payloads",
-                "home_links": [{"href": "/security/bad-links", "label": "Bad Links"}],
+                "home_links": [
+                    {"href": "/security/bad-links", "label": "Bad Links"},
+                    {"href": "/security/bad-links/javascript-href", "label": "H1: javascript: Href"},
+                    {"href": "/security/bad-links/data-url", "label": "H2: data: URL Href"},
+                    {"href": "/security/bad-links/tabnabbing", "label": "H3: Tabnabbing"},
+                ],
+            },
+            {
+                "path": "/security/bad-links/javascript-href",
+                "crawl_worthy": True,
+                "category": "security_bad_links_javascript_href",
+                "label": "H1: javascript: Href mock test",
+            },
+            {
+                "path": "/security/bad-links/data-url",
+                "crawl_worthy": True,
+                "category": "security_bad_links_data_url",
+                "label": "H2: data: URL Href mock test",
+            },
+            {
+                "path": "/security/bad-links/tabnabbing",
+                "crawl_worthy": True,
+                "category": "security_bad_links_tabnabbing",
+                "label": "H3: Tabnabbing mock test",
             },
             {
                 "path": "/security/clean-controls",
@@ -970,6 +1000,22 @@ TEST_SECTIONS: List[Dict[str, Any]] = [
                     {
                         "href": "/product-pages/javascript-calculated",
                         "label": "Product variants - JavaScript calculated",
+                    }
+                ],
+            },
+            {
+                "path": "/product-pages/javascript-rendered-grid",
+                "crawl_worthy": True,
+                "category": "javascript_rendered_product_grid",
+                "product_variant_strategy": "javascript_rendered_collection_grid",
+                "requires_javascript": True,
+                "data_not_in_initial_dom": True,
+                "javascript_rendered_product_grid": True,
+                "label": "Product collection - JavaScript rendered grid",
+                "home_links": [
+                    {
+                        "href": "/product-pages/javascript-rendered-grid",
+                        "label": "Product collection - JavaScript rendered grid",
                     }
                 ],
             },

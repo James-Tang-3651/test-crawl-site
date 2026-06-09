@@ -9,7 +9,7 @@ Notes:
 - The route-only section lists valid app endpoints that are not unique manifest content pages, including JSON endpoints, server-only fragments, redirect aliases, sitemap files, robots-blocked targets, and downloadable/media assets.
 - Status-code test endpoints such as `/status/404` are valid test routes even though they intentionally return non-2xx responses.
 
-## Manifest URLs (211)
+## Manifest URLs (212)
 
 ### Core URL Handling (17)
 
@@ -230,10 +230,11 @@ Notes:
 - `/accept-consent` - Accept consent route
 - `/fr/about` - French About page with /fr path
 
-### Product Pages (12)
+### Product Pages (13)
 
 - `/product-pages/separate-pages` - Product variants - Separate pages
 - `/product-pages/javascript-calculated` - Product variants - JavaScript calculated
+- `/product-pages/javascript-rendered-grid` - Product collection - JavaScript rendered grid
 - `/product-pages/laptop-configurator` - Laptop configurator - Dependent options
 - `/product-pages/separate-pages/steel-blue/18oz` - Product variant page: Steel Blue / 18 oz
 - `/product-pages/separate-pages/steel-blue/24oz` - Product variant page: Steel Blue / 24 oz
@@ -261,9 +262,10 @@ Notes:
 - `/structured-content/article` - Structured article content hub
 - `/structured-content/article/paywall-preview` - Paywall preview page
 
-## Data and Server-Only Endpoints (12)
+## Data and Server-Only Endpoints (13)
 
 - `/product-pages/javascript-calculated/data.json`
+- `/product-pages/javascript-rendered-grid/data.json`
 - `/product-pages/laptop-configurator/data.json`
 - `/server-only/accordion/dry`
 - `/server-only/accordion/soup`
