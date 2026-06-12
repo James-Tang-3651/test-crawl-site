@@ -164,7 +164,9 @@ function queryPage(url) {
     Object.entries(params).sort(([left], [right]) => left.localeCompare(right)),
   );
   const content = JSON.stringify(sortedParams);
-  return htmlResponse("Query Page", `<p>Query page content: ${escapeHtml(content)}</p>`);
+  const values = Object.values(sortedParams);
+  const title = values.length ? `Query Page - ${values.join(", ")}` : "Query Page";
+  return htmlResponse(escapeHtml(title), `<p>Query page content: ${escapeHtml(content)}</p>`);
 }
 
 function hasCookie(request, name, expectedValue) {

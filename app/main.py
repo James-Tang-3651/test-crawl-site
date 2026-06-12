@@ -2190,7 +2190,10 @@ async def base_child():
 async def query_page(request: Request):
     params = dict(request.query_params)
     content = json.dumps(params, sort_keys=True)
-    return html_page("Query Page", f"<p>Query page content: {content}</p>")
+    title = "Query Page"
+    if params:
+        title += " - " + ", ".join(params[key] for key in sorted(params))
+    return html_page(escape(title), f"<p>Query page content: {content}</p>")
 
 
 @app.get("/product-pages/separate-pages", response_class=HTMLResponse)
