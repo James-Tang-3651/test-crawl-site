@@ -173,8 +173,9 @@ function queryPage(url) {
 
 const slashQueryCanonicalBody = `
     <article>
-      <p>This page intentionally serves the same HTML for the base URL and for tracking query variants.</p>
-      <p>The no-slash form redirects to the slash form while preserving the query string.</p>
+      <p>This page simulates a WordPress site where the CDN cache serves an optimized build
+         for the bare URL but bypasses the cache for any query-string variant, resulting in
+         different HTML bytes even though the visible content is identical.</p>
       <nav>
         <a href="/slash-query-canonical/">Canonical slash page</a>
         <a href="/slash-query-canonical/?campaign_id=blog-client-visits">Campaign link A</a>
@@ -185,10 +186,26 @@ const slashQueryCanonicalBody = `
     </article>
     `;
 
-function slashQueryCanonicalPage() {
-  return htmlResponse("Slash Query Canonical Page", slashQueryCanonicalBody, {
-    head: '<link rel="canonical" href="/slash-query-canonical/" />',
-  });
+// Simulates WP Rocket cached output: CSS inlined, JS deferred via data-rocket-src.
+const slashQueryHeadCached = `
+    <link rel="canonical" href="/slash-query-canonical/" />
+    <style id="wpr-usedcss">body{margin:0;font-family:sans-serif}/* cache-optimized inline CSS */</style>
+    <script data-rocket-src="/static/vendor.js" type="rocketlazyloadscript"></script>
+    <script data-rocket-src="/static/app.js" type="rocketlazyloadscript"></script>`;
+
+// Simulates raw WordPress output: external CSS/JS loaded normally, cache bypassed by query string.
+const slashQueryHeadRaw = `
+    <link rel="canonical" href="/slash-query-canonical/" />
+    <link rel="dns-prefetch" href="//fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" id="vendor-css" href="/static/vendor.css" />
+    <link rel="stylesheet" id="app-css" href="/static/app.css" />
+    <script src="/static/vendor.js"></script>
+    <script src="/static/app.js"></script>`;
+
+function slashQueryCanonicalPage(url) {
+  const head = url.search ? slashQueryHeadRaw : slashQueryHeadCached;
+  return htmlResponse("Slash Query Canonical Page", slashQueryCanonicalBody, {head});
 }
 
 function slashQueryCanonicalRedirect(url) {
@@ -593,7 +610,7 @@ export default async function handler(request) {
   }
 
   if (url.pathname === "/slash-query-canonical/") {
-    return slashQueryCanonicalPage();
+    return slashQueryCanonicalPage(url);
   }
 
   if (url.pathname === "/localhost-link") {
