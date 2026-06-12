@@ -623,9 +623,9 @@ TEST_SECTIONS: List[Dict[str, Any]] = [
                 "path": "/intermittent-error",
                 "crawl_worthy": True,
                 "category": "intermittent_error",
-                "label": "Intermittent error page (503 half of each hour)",
+                "label": "Intermittent error page (1 success then 3 failures, cycling)",
                 "home_links": [
-                    {"href": "/intermittent-error", "label": "Intermittent error page (timed 503 windows)"},
+                    {"href": "/intermittent-error", "label": "Intermittent error page (cycling 503 pattern)"},
                 ],
             },
             {

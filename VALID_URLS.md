@@ -8,7 +8,7 @@ Notes:
 - The manifest section lists unique crawl-worthy paths from `PAGE_MANIFEST`, including generated `/depth/*`, `/many/item/*`, and product variant pages.
 - The route-only section lists valid app endpoints that are not unique manifest content pages, including JSON endpoints, server-only fragments, redirect aliases, sitemap files, robots-blocked targets, and downloadable/media assets.
 - Status-code test endpoints such as `/status/404` are valid test routes even though they intentionally return non-2xx responses.
-- `/intermittent-error` is time-windowed: it serves 200 during minutes 00-29 of each UTC hour and 503 (with Retry-After) during minutes 30-59, so crawl results for it depend on when the crawl ran.
+- `/intermittent-error` uses a request-count cycle: request 1 → 200, requests 2-4 → 503, request 5 → 200, etc. (1 success then 3 failures, repeating). The counter is in-process and resets on server restart. Crawl results depend on how many times the page has been hit since the last restart.
 - `/share-links` exposes share-widget anchors (AddToAny/Facebook style) that point at `/weather/vancouver-daily-report` standing in for the share service, with a percent-encoded URL of this site's About page embedded in their query string or fragment. The valid discovered URLs there are the weather report URLs only; `/about/?campaign_id=share-fragment`, `/about/?campaign_id=share-query`, and `/about/?campaign_id=share-double-encoded` must NOT appear in a crawl — their presence means the crawler decoded a URL embedded inside another URL.
 
 ## Manifest URLs (214)

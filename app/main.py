@@ -176,6 +176,8 @@ LONG_HREF_PAYLOAD = "long-url-segment-" + ("a" * 2100)
 LONG_HREF_PATH = f"/long-href-target/?{urlencode({'payload': LONG_HREF_PAYLOAD})}"
 TRANSIENT_LOAD_FAILURES = 5
 transient_load_counts: dict[str, int] = {}
+INTERMITTENT_FAIL_COUNT = 3
+intermittent_error_count: int = 0
 OVERSIZED_TITLE = "Oversized Title " + ("T" * 1100)
 OVERSIZED_MIME_TYPE = "application/" + ("vnd.crawltest." * 22) + "html"
 OVERSIZED_CHARSET = "utf-" + ("crawltest-" * 32) + "8"
@@ -1951,22 +1953,25 @@ async def transient_load_child():
 
 @app.get("/intermittent-error", response_class=HTMLResponse)
 async def intermittent_error():
-    now = datetime.now(timezone.utc)
-    if now.minute >= 30:
-        seconds_until_up = (59 - now.minute) * 60 + (60 - now.second)
+    global intermittent_error_count
+    intermittent_error_count += 1
+    count = intermittent_error_count
+    cycle_len = 1 + INTERMITTENT_FAIL_COUNT
+    position = (count - 1) % cycle_len
+    if position > 0:
+        remaining_fails = cycle_len - position
         return PlainTextResponse(
-            "Intermittent error window: this page returns 503 during the second half of each "
-            f"UTC hour (minutes 30-59). It recovers in about {seconds_until_up} seconds.",
+            f"Intermittent error (request {count}, position {position + 1} of {cycle_len} in cycle). "
+            f"This page fails {INTERMITTENT_FAIL_COUNT} times after each success. "
+            f"{remaining_fails} more failure(s) before the next success.",
             status_code=503,
-            headers={"Retry-After": str(seconds_until_up)},
+            headers={"Retry-After": "1"},
         )
-    minutes_until_down = 30 - now.minute
+    successes_so_far = (count - 1) // cycle_len + 1
     body = f"""
-    <p>This page simulates a recurring outage on a timer: it serves 200 during the first half
-       of each UTC hour (minutes 00-29) and 503 with a Retry-After header during the second
-       half (minutes 30-59). No reset is needed; recovery happens on the clock.</p>
-    <p>Current UTC time: {now.strftime("%H:%M")}. The next error window starts in about
-       {minutes_until_down} minute(s).</p>
+    <p>This page simulates intermittent failures on a request cycle: it succeeds once, then
+       fails the next {INTERMITTENT_FAIL_COUNT} requests, then succeeds again, repeating indefinitely.</p>
+    <p>Request {count} — success #{successes_so_far}. The next {INTERMITTENT_FAIL_COUNT} requests will return 503.</p>
     <a href="/query-page/?from=intermittent-error">Intermittent error child link</a>
     """
     return html_page("Intermittent Error Page", body)

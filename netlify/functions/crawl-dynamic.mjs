@@ -47,6 +47,8 @@ function wait(milliseconds) {
 
 const transientLoadFailures = 5;
 const transientLoadCounts = new Map();
+const intermittentFailCount = 3;
+let intermittentErrorCount = 0;
 
 const weatherImages = {
   sunny: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 160"><rect width="240" height="160" fill="#e7f5ff"/><circle cx="120" cy="78" r="34" fill="#ffd43b"/><g stroke="#f08c00" stroke-width="8" stroke-linecap="round"><path d="M120 18v18"/><path d="M120 120v18"/><path d="M60 78H42"/><path d="M198 78h-18"/><path d="m77 35 13 13"/><path d="m163 121-13-13"/><path d="m77 121 13-13"/><path d="m163 35-13 13"/></g></svg>',
@@ -255,31 +257,29 @@ async function slowPage() {
 }
 
 function intermittentErrorPage() {
-  const now = new Date();
-  const minute = now.getUTCMinutes();
-  if (minute >= 30) {
-    const secondsUntilUp = (59 - minute) * 60 + (60 - now.getUTCSeconds());
+  const count = ++intermittentErrorCount;
+  const cycleLen = 1 + intermittentFailCount;
+  const position = (count - 1) % cycleLen;
+  if (position > 0) {
+    const remainingFails = cycleLen - position;
     return new Response(
-      "Intermittent error window: this page returns 503 during the second half of each " +
-        `UTC hour (minutes 30-59). It recovers in about ${secondsUntilUp} seconds.`,
+      `Intermittent error (request ${count}, position ${position + 1} of ${cycleLen} in cycle). ` +
+        `This page fails ${intermittentFailCount} times after each success. ` +
+        `${remainingFails} more failure(s) before the next success.`,
       {
         status: 503,
         headers: {
           "content-type": "text/plain; charset=utf-8",
-          "retry-after": String(secondsUntilUp),
+          "retry-after": "1",
         },
       },
     );
   }
-  const minutesUntilDown = 30 - minute;
-  const hh = String(now.getUTCHours()).padStart(2, "0");
-  const mm = String(minute).padStart(2, "0");
+  const successesSOFar = Math.floor((count - 1) / cycleLen) + 1;
   const body = `
-    <p>This page simulates a recurring outage on a timer: it serves 200 during the first half
-       of each UTC hour (minutes 00-29) and 503 with a Retry-After header during the second
-       half (minutes 30-59). No reset is needed; recovery happens on the clock.</p>
-    <p>Current UTC time: ${hh}:${mm}. The next error window starts in about
-       ${minutesUntilDown} minute(s).</p>
+    <p>This page simulates intermittent failures on a request cycle: it succeeds once, then
+       fails the next ${intermittentFailCount} requests, then succeeds again, repeating indefinitely.</p>
+    <p>Request ${count} — success #${successesSOFar}. The next ${intermittentFailCount} requests will return 503.</p>
     <a href="/query-page/?from=intermittent-error">Intermittent error child link</a>
     `;
   return htmlResponse("Intermittent Error Page", body);
