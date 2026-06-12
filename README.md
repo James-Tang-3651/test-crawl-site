@@ -109,6 +109,8 @@ these routes:
 - `/_manifest`
 - `/about`
 - `/query-page/?sort=price`
+- `/slash-query-canonical?campaign_id=blog-client-visits`
+- `/slash-query-canonical/?campaign_id=blog-client-visits`
 - `/status/404`
 - `/status/429`
 - `/status/500`
@@ -133,6 +135,7 @@ crawler-facing behavior should match Netlify.
 
 - `/` root page with mixed links
 - `/_manifest` machine-readable page inventory
+- `/slash-query-canonical?campaign_id=<id>` redirects to `/slash-query-canonical/?campaign_id=<id>` with 301 while the slash query variants serve duplicate tracking-param content
 - `/long-href` page with an href longer than 2048 characters
 - `/transient-load/?key=<run-id>` page that returns 503 for five requests, then 200
 - `/transient-load/status?key=<run-id>` status endpoint for transient load tests

@@ -171,6 +171,32 @@ function queryPage(url) {
   return htmlResponse(escapeHtml(title), `<p>Query page content: ${escapeHtml(content)}</p>`);
 }
 
+const slashQueryCanonicalBody = `
+    <article>
+      <p>This page intentionally serves the same HTML for the base URL and for tracking query variants.</p>
+      <p>The no-slash form redirects to the slash form while preserving the query string.</p>
+      <nav>
+        <a href="/slash-query-canonical/">Canonical slash page</a>
+        <a href="/slash-query-canonical/?campaign_id=blog-client-visits">Campaign link A</a>
+        <a href="/slash-query-canonical/?campaign_id=resources-bottom">Campaign link B</a>
+        <a href="/slash-query-canonical?campaign_id=blog-client-visits">No-slash redirect A</a>
+        <a href="/slash-query-canonical?campaign_id=resources-bottom">No-slash redirect B</a>
+      </nav>
+    </article>
+    `;
+
+function slashQueryCanonicalPage() {
+  return htmlResponse("Slash Query Canonical Page", slashQueryCanonicalBody, {
+    head: '<link rel="canonical" href="/slash-query-canonical/" />',
+  });
+}
+
+function slashQueryCanonicalRedirect(url) {
+  const target = new URL(url);
+  target.pathname = "/slash-query-canonical/";
+  return Response.redirect(target, 301);
+}
+
 function hasCookie(request, name, expectedValue) {
   const cookieHeader = request.headers.get("cookie") ?? "";
   return cookieHeader
@@ -532,10 +558,11 @@ async function vancouverWeeklyWeatherReport() {
 
 export default async function handler(request) {
   const url = new URL(request.url);
+  const slashSensitivePaths = new Set(["/slash-query-canonical/"]);
 
   // Site links place a slash right before the query string (/path/?query),
   // so treat /path/ and /path as the same route.
-  if (url.pathname.length > 1 && url.pathname.endsWith("/")) {
+  if (url.pathname.length > 1 && url.pathname.endsWith("/") && !slashSensitivePaths.has(url.pathname)) {
     url.pathname = url.pathname.slice(0, -1);
   }
 
@@ -559,6 +586,14 @@ export default async function handler(request) {
 
   if (url.pathname === "/query-page") {
     return queryPage(url);
+  }
+
+  if (url.pathname === "/slash-query-canonical") {
+    return slashQueryCanonicalRedirect(url);
+  }
+
+  if (url.pathname === "/slash-query-canonical/") {
+    return slashQueryCanonicalPage();
   }
 
   if (url.pathname === "/localhost-link") {
@@ -617,6 +652,8 @@ export const config = {
     "/localhost-link/",
     "/query-page",
     "/query-page/",
+    "/slash-query-canonical",
+    "/slash-query-canonical/",
     "/redirect-middle",
     "/slow",
     "/slow/",

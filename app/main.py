@@ -2224,6 +2224,34 @@ async def query_page(request: Request):
     return html_page(escape(title), f"<p>Query page content: {content}</p>")
 
 
+SLASH_QUERY_CANONICAL_BODY = """
+    <article>
+      <p>This page intentionally serves the same HTML for the base URL and for tracking query variants.</p>
+      <p>The no-slash form redirects to the slash form while preserving the query string.</p>
+      <nav>
+        <a href="/slash-query-canonical/">Canonical slash page</a>
+        <a href="/slash-query-canonical/?campaign_id=blog-client-visits">Campaign link A</a>
+        <a href="/slash-query-canonical/?campaign_id=resources-bottom">Campaign link B</a>
+        <a href="/slash-query-canonical?campaign_id=blog-client-visits">No-slash redirect A</a>
+        <a href="/slash-query-canonical?campaign_id=resources-bottom">No-slash redirect B</a>
+      </nav>
+    </article>
+    """
+
+
+@app.get("/slash-query-canonical")
+async def slash_query_canonical_redirect(request: Request):
+    query = request.url.query
+    target = "/slash-query-canonical/" + (f"?{query}" if query else "")
+    return RedirectResponse(target, status_code=301)
+
+
+@app.get("/slash-query-canonical/", response_class=HTMLResponse)
+async def slash_query_canonical():
+    head = '<link rel="canonical" href="/slash-query-canonical/" />'
+    return html_page("Slash Query Canonical Page", SLASH_QUERY_CANONICAL_BODY, head=head)
+
+
 @app.get("/product-pages/separate-pages", response_class=HTMLResponse)
 async def product_separate_pages_default():
     return product_separate_page(PRODUCT_DEFAULT_COLOR, PRODUCT_DEFAULT_SIZE)

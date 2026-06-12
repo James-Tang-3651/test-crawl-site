@@ -188,6 +188,40 @@ TEST_SECTIONS: List[Dict[str, Any]] = [
         ],
     },
     {
+        "id": "slash-query-redirects",
+        "title": "Slash Query Redirects",
+        "entries": [
+            {
+                "path": "/slash-query-canonical/",
+                "crawl_worthy": True,
+                "category": "slash_query_redirect",
+                "label": "Slash query canonical page",
+                "query_params_ignored": True,
+                "no_slash_redirects_to_slash": True,
+                "duplicate_content_expected_for_tracking_params": True,
+                "home_links": [
+                    {"href": "/slash-query-canonical/", "label": "Slash query canonical base"},
+                    {
+                        "href": "/slash-query-canonical/?campaign_id=blog-client-visits",
+                        "label": "Slash query canonical campaign A",
+                    },
+                    {
+                        "href": "/slash-query-canonical/?campaign_id=resources-bottom",
+                        "label": "Slash query canonical campaign B",
+                    },
+                    {
+                        "href": "/slash-query-canonical?campaign_id=blog-client-visits",
+                        "label": "No-slash query redirect campaign A",
+                    },
+                    {
+                        "href": "/slash-query-canonical?campaign_id=resources-bottom",
+                        "label": "No-slash query redirect campaign B",
+                    },
+                ],
+            },
+        ],
+    },
+    {
         "id": "hash-navigation",
         "title": "Hash Navigation",
         "entries": [

@@ -70,6 +70,8 @@ FUNCTION_PATHS = {
     "/intermittent-error",
     "/localhost-link",
     "/query-page",
+    "/slash-query-canonical",
+    "/slash-query-canonical/",
     "/redirect-middle",
     "/slow",
     "/status/504",
