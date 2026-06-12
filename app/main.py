@@ -2240,15 +2240,15 @@ SLASH_QUERY_CANONICAL_BODY = """
     """
 
 # Simulates WP Rocket cached output: CSS inlined, JS deferred via data-rocket-src.
+# Canonical tag deliberately omitted: testing whether the crawler collapses query
+# variants onto the no-query canonical URL.
 SLASH_QUERY_HEAD_CACHED = """
-    <link rel="canonical" href="/slash-query-canonical/" />
     <style id="wpr-usedcss">body{margin:0;font-family:sans-serif}/* cache-optimized inline CSS */</style>
     <script data-rocket-src="/static/vendor.js" type="rocketlazyloadscript"></script>
     <script data-rocket-src="/static/app.js" type="rocketlazyloadscript"></script>"""
 
 # Simulates raw WordPress output: external CSS/JS loaded normally, cache bypassed by query string.
 SLASH_QUERY_HEAD_RAW = """
-    <link rel="canonical" href="/slash-query-canonical/" />
     <link rel="dns-prefetch" href="//fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" id="vendor-css" href="/static/vendor.css" />
