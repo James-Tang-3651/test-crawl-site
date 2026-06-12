@@ -620,6 +620,15 @@ TEST_SECTIONS: List[Dict[str, Any]] = [
                 "label": "Transient load child page",
             },
             {
+                "path": "/intermittent-error",
+                "crawl_worthy": True,
+                "category": "intermittent_error",
+                "label": "Intermittent error page (503 half of each hour)",
+                "home_links": [
+                    {"href": "/intermittent-error", "label": "Intermittent error page (timed 503 windows)"},
+                ],
+            },
+            {
                 "path": "/empty",
                 "crawl_worthy": True,
                 "category": "empty_200",

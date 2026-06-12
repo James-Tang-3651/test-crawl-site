@@ -254,6 +254,37 @@ async function slowPage() {
   );
 }
 
+function intermittentErrorPage() {
+  const now = new Date();
+  const minute = now.getUTCMinutes();
+  if (minute >= 30) {
+    const secondsUntilUp = (59 - minute) * 60 + (60 - now.getUTCSeconds());
+    return new Response(
+      "Intermittent error window: this page returns 503 during the second half of each " +
+        `UTC hour (minutes 30-59). It recovers in about ${secondsUntilUp} seconds.`,
+      {
+        status: 503,
+        headers: {
+          "content-type": "text/plain; charset=utf-8",
+          "retry-after": String(secondsUntilUp),
+        },
+      },
+    );
+  }
+  const minutesUntilDown = 30 - minute;
+  const hh = String(now.getUTCHours()).padStart(2, "0");
+  const mm = String(minute).padStart(2, "0");
+  const body = `
+    <p>This page simulates a recurring outage on a timer: it serves 200 during the first half
+       of each UTC hour (minutes 00-29) and 503 with a Retry-After header during the second
+       half (minutes 30-59). No reset is needed; recovery happens on the clock.</p>
+    <p>Current UTC time: ${hh}:${mm}. The next error window starts in about
+       ${minutesUntilDown} minute(s).</p>
+    <a href="/query-page/?from=intermittent-error">Intermittent error child link</a>
+    `;
+  return htmlResponse("Intermittent Error Page", body);
+}
+
 function transientLoadPage(url) {
   const key = url.searchParams.get("key") || "default";
   const count = (transientLoadCounts.get(key) || 0) + 1;
@@ -542,6 +573,10 @@ export default async function handler(request) {
     return status504Page();
   }
 
+  if (url.pathname === "/intermittent-error") {
+    return intermittentErrorPage();
+  }
+
   if (url.pathname === "/transient-load") {
     return transientLoadPage(url);
   }
@@ -577,6 +612,7 @@ export const config = {
     "/accept-consent",
     "/about",
     "/about/",
+    "/intermittent-error",
     "/localhost-link",
     "/localhost-link/",
     "/query-page",

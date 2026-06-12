@@ -1949,6 +1949,29 @@ async def transient_load_child():
     return html_page("Transient Load Child Page", body)
 
 
+@app.get("/intermittent-error", response_class=HTMLResponse)
+async def intermittent_error():
+    now = datetime.now(timezone.utc)
+    if now.minute >= 30:
+        seconds_until_up = (59 - now.minute) * 60 + (60 - now.second)
+        return PlainTextResponse(
+            "Intermittent error window: this page returns 503 during the second half of each "
+            f"UTC hour (minutes 30-59). It recovers in about {seconds_until_up} seconds.",
+            status_code=503,
+            headers={"Retry-After": str(seconds_until_up)},
+        )
+    minutes_until_down = 30 - now.minute
+    body = f"""
+    <p>This page simulates a recurring outage on a timer: it serves 200 during the first half
+       of each UTC hour (minutes 00-29) and 503 with a Retry-After header during the second
+       half (minutes 30-59). No reset is needed; recovery happens on the clock.</p>
+    <p>Current UTC time: {now.strftime("%H:%M")}. The next error window starts in about
+       {minutes_until_down} minute(s).</p>
+    <a href="/query-page/?from=intermittent-error">Intermittent error child link</a>
+    """
+    return html_page("Intermittent Error Page", body)
+
+
 @app.get("/transient-load/status")
 async def transient_load_status(key: str = "default"):
     return JSONResponse(transient_load_status_payload(key))

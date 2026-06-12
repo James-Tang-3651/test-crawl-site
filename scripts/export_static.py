@@ -67,6 +67,7 @@ EXTRA_PATHS = [
 FUNCTION_PATHS = {
     "/accept-consent",
     "/about",
+    "/intermittent-error",
     "/localhost-link",
     "/query-page",
     "/redirect-middle",

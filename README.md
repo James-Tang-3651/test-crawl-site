@@ -137,6 +137,7 @@ crawler-facing behavior should match Netlify.
 - `/transient-load/?key=<run-id>` page that returns 503 for five requests, then 200
 - `/transient-load/status?key=<run-id>` status endpoint for transient load tests
 - `/transient-load/reset?key=<run-id>` reset endpoint for transient load tests
+- `/intermittent-error` timed-outage page: 200 during minutes 00-29 of each UTC hour, 503 with Retry-After during minutes 30-59
 - `/oversized-title` char-limit page for title values longer than 1024 characters
 - `/oversized-charset` char-limit page for charset values longer than 256 characters
 - `/oversized-mime-type` char-limit response for MIME type values longer than 256 characters
