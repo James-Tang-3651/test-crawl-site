@@ -176,6 +176,15 @@ TEST_SECTIONS: List[Dict[str, Any]] = [
                 "label": "External URL",
                 "home_links": [{"href": "https://example.org/external", "label": "External URL"}],
             },
+            {
+                "path": "/share-links",
+                "crawl_worthy": True,
+                "category": "share_widget_links",
+                "label": "Share widget links with embedded encoded URLs",
+                "home_links": [
+                    {"href": "/share-links", "label": "Share widget links with embedded encoded URLs"},
+                ],
+            },
         ],
     },
     {
