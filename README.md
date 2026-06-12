@@ -109,6 +109,8 @@ these routes:
 - `/_manifest`
 - `/about`
 - `/query-page/?sort=price`
+- `/slash-query-canonical?campaign_id=blog-client-visits`
+- `/slash-query-canonical/?campaign_id=blog-client-visits`
 - `/status/404`
 - `/status/429`
 - `/status/500`
@@ -133,10 +135,12 @@ crawler-facing behavior should match Netlify.
 
 - `/` root page with mixed links
 - `/_manifest` machine-readable page inventory
+- `/slash-query-canonical?campaign_id=<id>` redirects to `/slash-query-canonical/?campaign_id=<id>` with 301 while the slash query variants serve duplicate tracking-param content
 - `/long-href` page with an href longer than 2048 characters
 - `/transient-load/?key=<run-id>` page that returns 503 for five requests, then 200
 - `/transient-load/status?key=<run-id>` status endpoint for transient load tests
 - `/transient-load/reset?key=<run-id>` reset endpoint for transient load tests
+- `/intermittent-error` cycling-outage page: succeeds on request 1, fails requests 2-4 (503 + Retry-After: 1), succeeds again on request 5, repeating (1 success → 3 failures)
 - `/oversized-title` char-limit page for title values longer than 1024 characters
 - `/oversized-charset` char-limit page for charset values longer than 256 characters
 - `/oversized-mime-type` char-limit response for MIME type values longer than 256 characters

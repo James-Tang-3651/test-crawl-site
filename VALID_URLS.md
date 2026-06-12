@@ -8,9 +8,10 @@ Notes:
 - The manifest section lists unique crawl-worthy paths from `PAGE_MANIFEST`, including generated `/depth/*`, `/many/item/*`, and product variant pages.
 - The route-only section lists valid app endpoints that are not unique manifest content pages, including JSON endpoints, server-only fragments, redirect aliases, sitemap files, robots-blocked targets, and downloadable/media assets.
 - Status-code test endpoints such as `/status/404` are valid test routes even though they intentionally return non-2xx responses.
+- `/intermittent-error` uses a request-count cycle: request 1 → 200, requests 2-4 → 503, request 5 → 200, etc. (1 success then 3 failures, repeating). The counter is in-process and resets on server restart. Crawl results depend on how many times the page has been hit since the last restart.
 - `/share-links` exposes share-widget anchors (AddToAny/Facebook style) that point at `/weather/vancouver-daily-report` standing in for the share service, with a percent-encoded URL of this site's About page embedded in their query string or fragment. The valid discovered URLs there are the weather report URLs only; `/about/?campaign_id=share-fragment`, `/about/?campaign_id=share-query`, and `/about/?campaign_id=share-double-encoded` must NOT appear in a crawl — their presence means the crawler decoded a URL embedded inside another URL.
 
-## Manifest URLs (213)
+## Manifest URLs (215)
 
 ### Core URL Handling (18)
 
@@ -32,6 +33,10 @@ Notes:
 - `/long-href` - Long href over 2048 characters
 - `/long-href-target` - Long href target
 - `/legacy.php` - Legacy PHP-style page
+
+### Slash Query Redirects (1)
+
+- `/slash-query-canonical/` - Slash query canonical page
 
 ### Redirects (5)
 
@@ -73,12 +78,13 @@ Notes:
 - `/security/bad-links` - XSS Bad Link payloads
 - `/security/clean-controls` - Security clean control cases
 
-### Errors and Status (13)
+### Errors and Status (14)
 
 - `/broken` - Broken HTML
 - `/slow` - Slow page
 - `/transient-load` - Transient load failure then success
 - `/transient-load-child` - Transient load child page
+- `/intermittent-error` - Intermittent error page (503 half of each hour)
 - `/empty` - Empty 200 page
 - `/soft-error` - Soft error page
 - `/status/403` - 403 page
@@ -280,15 +286,16 @@ Notes:
 - `/server-only/tabs/toppings`
 - `/weather/vancouver-daily-report/data.json`
 
-## Redirect and Legacy Alias Endpoints (5)
+## Redirect and Legacy Alias Endpoints (6)
 
 - `/paywall-preview`
 - `/redirect-loop-b`
 - `/redirect-middle`
+- `/slash-query-canonical`
 - `/table-content`
 - `/table-link`
 
-## Sitemap, Robots, and Policy Endpoints (19)
+## Sitemap, Robots, and Policy Endpoints (20)
 
 - `/robots-blocked`
 - `/sitemap-discovery-fail.xml`
@@ -303,6 +310,7 @@ Notes:
 - `/sitemaps/redirects.xml`
 - `/sitemaps/scale-graph.xml`
 - `/sitemaps/security-test.xml`
+- `/sitemaps/slash-query-redirects.xml`
 - `/sitemaps/structured-content.xml`
 - `/sitemaps/structured-content/article.xml`
 - `/sitemaps/structured-content/list.xml`
@@ -327,7 +335,7 @@ Notes:
 - `/_manifest`
 - `/fr/noodles`
 
-## Known Link Variants With Query, Fragment, or Absolute Host Form (101)
+## Known Link Variants With Query, Fragment, or Absolute Host Form (106)
 
 - `//{HOST}/protocol-relative-target`
 - `/about/?from=article-related-load`
@@ -406,6 +414,7 @@ Notes:
 - `/query-page/?from=carousel`
 - `/query-page/?from=carousel-arrows`
 - `/query-page/?from=chatbot-widget`
+- `/query-page/?from=intermittent-error`
 - `/query-page/?from=javascript-created`
 - `/query-page/?from=legacy-php`
 - `/query-page/?from=paywall-preview`
@@ -423,6 +432,10 @@ Notes:
 - `/query-page/?sort=price`
 - `/query-page/?topic=broth&from=markdown-inline`
 - `/query-page/?topic=toppings&from=markdown-reference`
+- `/slash-query-canonical/?campaign_id=blog-client-visits`
+- `/slash-query-canonical/?campaign_id=resources-bottom`
+- `/slash-query-canonical?campaign_id=blog-client-visits`
+- `/slash-query-canonical?campaign_id=resources-bottom`
 - `/structured-content/list/basic/?from=markdown-reference`
 - `/structured-content/table/links/?from=sitemap-discovery-fail`
 - `/structured-content/?from=load-test`

@@ -47,6 +47,8 @@ function wait(milliseconds) {
 
 const transientLoadFailures = 5;
 const transientLoadCounts = new Map();
+const intermittentFailCount = 3;
+let intermittentErrorCount = 0;
 
 const weatherImages = {
   sunny: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 160"><rect width="240" height="160" fill="#e7f5ff"/><circle cx="120" cy="78" r="34" fill="#ffd43b"/><g stroke="#f08c00" stroke-width="8" stroke-linecap="round"><path d="M120 18v18"/><path d="M120 120v18"/><path d="M60 78H42"/><path d="M198 78h-18"/><path d="m77 35 13 13"/><path d="m163 121-13-13"/><path d="m77 121 13-13"/><path d="m163 35-13 13"/></g></svg>',
@@ -164,7 +166,35 @@ function queryPage(url) {
     Object.entries(params).sort(([left], [right]) => left.localeCompare(right)),
   );
   const content = JSON.stringify(sortedParams);
-  return htmlResponse("Query Page", `<p>Query page content: ${escapeHtml(content)}</p>`);
+  const values = Object.values(sortedParams);
+  const title = values.length ? `Query Page - ${values.join(", ")}` : "Query Page";
+  return htmlResponse(escapeHtml(title), `<p>Query page content: ${escapeHtml(content)}</p>`);
+}
+
+const slashQueryCanonicalBody = `
+    <article>
+      <p>This page intentionally serves the same HTML for the base URL and for tracking query variants.</p>
+      <p>The no-slash form redirects to the slash form while preserving the query string.</p>
+      <nav>
+        <a href="/slash-query-canonical/">Canonical slash page</a>
+        <a href="/slash-query-canonical/?campaign_id=blog-client-visits">Campaign link A</a>
+        <a href="/slash-query-canonical/?campaign_id=resources-bottom">Campaign link B</a>
+        <a href="/slash-query-canonical?campaign_id=blog-client-visits">No-slash redirect A</a>
+        <a href="/slash-query-canonical?campaign_id=resources-bottom">No-slash redirect B</a>
+      </nav>
+    </article>
+    `;
+
+function slashQueryCanonicalPage() {
+  return htmlResponse("Slash Query Canonical Page", slashQueryCanonicalBody, {
+    head: '<link rel="canonical" href="/slash-query-canonical/" />',
+  });
+}
+
+function slashQueryCanonicalRedirect(url) {
+  const target = new URL(url);
+  target.pathname = "/slash-query-canonical/";
+  return Response.redirect(target, 301);
 }
 
 function hasCookie(request, name, expectedValue) {
@@ -250,6 +280,35 @@ async function slowPage() {
     "Slow Page",
     '<p>Slow page finished after a delay.</p><a href="/query-page/?ref=slow">Query from slow page</a>',
   );
+}
+
+function intermittentErrorPage() {
+  const count = ++intermittentErrorCount;
+  const cycleLen = 1 + intermittentFailCount;
+  const position = (count - 1) % cycleLen;
+  if (position > 0) {
+    const remainingFails = cycleLen - position;
+    return new Response(
+      `Intermittent error (request ${count}, position ${position + 1} of ${cycleLen} in cycle). ` +
+        `This page fails ${intermittentFailCount} times after each success. ` +
+        `${remainingFails} more failure(s) before the next success.`,
+      {
+        status: 503,
+        headers: {
+          "content-type": "text/plain; charset=utf-8",
+          "retry-after": "1",
+        },
+      },
+    );
+  }
+  const successesSOFar = Math.floor((count - 1) / cycleLen) + 1;
+  const body = `
+    <p>This page simulates intermittent failures on a request cycle: it succeeds once, then
+       fails the next ${intermittentFailCount} requests, then succeeds again, repeating indefinitely.</p>
+    <p>Request ${count} — success #${successesSOFar}. The next ${intermittentFailCount} requests will return 503.</p>
+    <a href="/query-page/?from=intermittent-error">Intermittent error child link</a>
+    `;
+  return htmlResponse("Intermittent Error Page", body);
 }
 
 function transientLoadPage(url) {
@@ -499,10 +558,11 @@ async function vancouverWeeklyWeatherReport() {
 
 export default async function handler(request) {
   const url = new URL(request.url);
+  const slashSensitivePaths = new Set(["/slash-query-canonical/"]);
 
   // Site links place a slash right before the query string (/path/?query),
   // so treat /path/ and /path as the same route.
-  if (url.pathname.length > 1 && url.pathname.endsWith("/")) {
+  if (url.pathname.length > 1 && url.pathname.endsWith("/") && !slashSensitivePaths.has(url.pathname)) {
     url.pathname = url.pathname.slice(0, -1);
   }
 
@@ -528,6 +588,14 @@ export default async function handler(request) {
     return queryPage(url);
   }
 
+  if (url.pathname === "/slash-query-canonical") {
+    return slashQueryCanonicalRedirect(url);
+  }
+
+  if (url.pathname === "/slash-query-canonical/") {
+    return slashQueryCanonicalPage();
+  }
+
   if (url.pathname === "/localhost-link") {
     return localhostLink(url);
   }
@@ -538,6 +606,10 @@ export default async function handler(request) {
 
   if (url.pathname === "/status/504") {
     return status504Page();
+  }
+
+  if (url.pathname === "/intermittent-error") {
+    return intermittentErrorPage();
   }
 
   if (url.pathname === "/transient-load") {
@@ -575,10 +647,13 @@ export const config = {
     "/accept-consent",
     "/about",
     "/about/",
+    "/intermittent-error",
     "/localhost-link",
     "/localhost-link/",
     "/query-page",
     "/query-page/",
+    "/slash-query-canonical",
+    "/slash-query-canonical/",
     "/redirect-middle",
     "/slow",
     "/slow/",

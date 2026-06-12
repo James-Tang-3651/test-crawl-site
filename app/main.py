@@ -176,6 +176,8 @@ LONG_HREF_PAYLOAD = "long-url-segment-" + ("a" * 2100)
 LONG_HREF_PATH = f"/long-href-target/?{urlencode({'payload': LONG_HREF_PAYLOAD})}"
 TRANSIENT_LOAD_FAILURES = 5
 transient_load_counts: dict[str, int] = {}
+INTERMITTENT_FAIL_COUNT = 3
+intermittent_error_count: int = 0
 OVERSIZED_TITLE = "Oversized Title " + ("T" * 1100)
 OVERSIZED_MIME_TYPE = "application/" + ("vnd.crawltest." * 22) + "html"
 OVERSIZED_CHARSET = "utf-" + ("crawltest-" * 32) + "8"
@@ -1949,6 +1951,32 @@ async def transient_load_child():
     return html_page("Transient Load Child Page", body)
 
 
+@app.get("/intermittent-error", response_class=HTMLResponse)
+async def intermittent_error():
+    global intermittent_error_count
+    intermittent_error_count += 1
+    count = intermittent_error_count
+    cycle_len = 1 + INTERMITTENT_FAIL_COUNT
+    position = (count - 1) % cycle_len
+    if position > 0:
+        remaining_fails = cycle_len - position
+        return PlainTextResponse(
+            f"Intermittent error (request {count}, position {position + 1} of {cycle_len} in cycle). "
+            f"This page fails {INTERMITTENT_FAIL_COUNT} times after each success. "
+            f"{remaining_fails} more failure(s) before the next success.",
+            status_code=503,
+            headers={"Retry-After": "1"},
+        )
+    successes_so_far = (count - 1) // cycle_len + 1
+    body = f"""
+    <p>This page simulates intermittent failures on a request cycle: it succeeds once, then
+       fails the next {INTERMITTENT_FAIL_COUNT} requests, then succeeds again, repeating indefinitely.</p>
+    <p>Request {count} — success #{successes_so_far}. The next {INTERMITTENT_FAIL_COUNT} requests will return 503.</p>
+    <a href="/query-page/?from=intermittent-error">Intermittent error child link</a>
+    """
+    return html_page("Intermittent Error Page", body)
+
+
 @app.get("/transient-load/status")
 async def transient_load_status(key: str = "default"):
     return JSONResponse(transient_load_status_payload(key))
@@ -2190,7 +2218,38 @@ async def base_child():
 async def query_page(request: Request):
     params = dict(request.query_params)
     content = json.dumps(params, sort_keys=True)
-    return html_page("Query Page", f"<p>Query page content: {content}</p>")
+    title = "Query Page"
+    if params:
+        title += " - " + ", ".join(params[key] for key in sorted(params))
+    return html_page(escape(title), f"<p>Query page content: {content}</p>")
+
+
+SLASH_QUERY_CANONICAL_BODY = """
+    <article>
+      <p>This page intentionally serves the same HTML for the base URL and for tracking query variants.</p>
+      <p>The no-slash form redirects to the slash form while preserving the query string.</p>
+      <nav>
+        <a href="/slash-query-canonical/">Canonical slash page</a>
+        <a href="/slash-query-canonical/?campaign_id=blog-client-visits">Campaign link A</a>
+        <a href="/slash-query-canonical/?campaign_id=resources-bottom">Campaign link B</a>
+        <a href="/slash-query-canonical?campaign_id=blog-client-visits">No-slash redirect A</a>
+        <a href="/slash-query-canonical?campaign_id=resources-bottom">No-slash redirect B</a>
+      </nav>
+    </article>
+    """
+
+
+@app.get("/slash-query-canonical")
+async def slash_query_canonical_redirect(request: Request):
+    query = request.url.query
+    target = "/slash-query-canonical/" + (f"?{query}" if query else "")
+    return RedirectResponse(target, status_code=301)
+
+
+@app.get("/slash-query-canonical/", response_class=HTMLResponse)
+async def slash_query_canonical():
+    head = '<link rel="canonical" href="/slash-query-canonical/" />'
+    return html_page("Slash Query Canonical Page", SLASH_QUERY_CANONICAL_BODY, head=head)
 
 
 @app.get("/product-pages/separate-pages", response_class=HTMLResponse)
