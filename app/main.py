@@ -4098,41 +4098,45 @@ async def share_links(request: Request):
     fragment_target = f"{base}/about/?campaign_id=share-fragment"
     query_target = f"{base}/about/?campaign_id=share-query"
     double_target = f"{base}/about/?campaign_id=share-double-encoded"
+    share_endpoint = "/weather/vancouver-daily-report"
     fragment_share = (
-        "https://www.addtoany.com/share"
+        f"{share_endpoint}"
         f"#url={quote(fragment_target, safe='')}"
         f"&title={quote('About the noodle stand', safe='')}"
     )
-    query_share = f"https://www.facebook.com/sharer/sharer.php?u={quote(query_target, safe='')}"
+    query_share = f"{share_endpoint}/?u={quote(query_target, safe='')}"
     double_share = (
-        "https://www.addtoany.com/share"
+        f"{share_endpoint}"
         f"#url={quote(quote(double_target, safe=''), safe='')}"
         f"&title={quote('About the noodle stand', safe='')}"
     )
     body = f"""
     <p>This page reproduces social share widgets (AddToAny, Facebook-style sharers) whose
-       hrefs point at an external service and carry a percent-encoded URL of a page on this
-       site inside their query string or fragment. The embedded URL is data passed to the
-       share service, not a link on this site.</p>
-    <p>A crawler should record each share anchor as a single external URL and skip it as
-       off-site. If any <code>/about/?campaign_id=share-*</code> URL appears in the crawl,
-       the crawler decoded a URL embedded inside another URL and will generate duplicates
+       hrefs carry a percent-encoded URL of another page on this site inside their query
+       string or fragment. The Vancouver daily weather report page stands in for the share
+       service endpoint, so the share anchors stay on this site and are crawlable. The
+       embedded URL is data passed to the share endpoint, not a link on this site.</p>
+    <p>A crawler should record each share anchor as the weather report URL it points at.
+       If any <code>/about/?campaign_id=share-*</code> URL appears in the crawl, the
+       crawler decoded a URL embedded inside another URL and will generate duplicates
        of the About page under tracking query strings.</p>
     <ul>
       <li>
-        <a class="a2a_dd" href="{escape(fragment_share, quote=True)}" aria-label="Share to more channels"><span>AddToAny share</span></a>
+        <a class="a2a_dd" href="{escape(fragment_share, quote=True)}" aria-label="Share to more channels"><span>AddToAny-style share</span></a>
         — encoded internal URL in the <code>#url=</code> fragment parameter.
       </li>
       <li>
-        <a href="{escape(query_share, quote=True)}" aria-label="Share on Facebook"><span>Facebook share</span></a>
+        <a href="{escape(query_share, quote=True)}" aria-label="Share on Facebook"><span>Facebook-style share</span></a>
         — encoded internal URL in the <code>?u=</code> query parameter.
       </li>
       <li>
-        <a class="a2a_dd" href="{escape(double_share, quote=True)}" aria-label="Share to more channels"><span>AddToAny share (double encoded)</span></a>
+        <a class="a2a_dd" href="{escape(double_share, quote=True)}" aria-label="Share to more channels"><span>AddToAny-style share (double encoded)</span></a>
         — internal URL percent-encoded twice in the <code>#url=</code> fragment parameter.
       </li>
     </ul>
-    <p>Expected discovered URLs from this page: the three external share service URLs only.</p>
+    <p>Expected discovered URLs from this page: <code>{share_endpoint}</code> (the two
+       fragment variants) and <code>{share_endpoint}/?u=...</code> (the query variant) —
+       never <code>/about/?campaign_id=share-*</code>.</p>
     """
     return html_page("Share widget links with embedded encoded URLs", body)
 

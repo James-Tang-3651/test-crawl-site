@@ -588,6 +588,7 @@ export const config = {
     "/transient-load/reset",
     "/transient-load/status",
     "/weather/vancouver-daily-report",
+    "/weather/vancouver-daily-report/",
     "/weather/vancouver-daily-report/data.json",
     "/weather/vancouver-weekly-report",
   ],
