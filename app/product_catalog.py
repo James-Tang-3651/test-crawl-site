@@ -196,9 +196,9 @@ LAPTOP_CONFIGURATOR_PAYLOAD: Dict[str, Any] = {
             "180W compact power adapter",
         ],
         "accessories": [
-            {"label": "Expansion card pack", "href": "/query-page?accessory=expansion-card-pack"},
-            {"label": "Laptop sleeve", "href": "/query-page?accessory=laptop-sleeve"},
-            {"label": "Spare input deck", "href": "/query-page?accessory=input-deck"},
+            {"label": "Expansion card pack", "href": "/query-page/?accessory=expansion-card-pack"},
+            {"label": "Laptop sleeve", "href": "/query-page/?accessory=laptop-sleeve"},
+            {"label": "Spare input deck", "href": "/query-page/?accessory=input-deck"},
         ],
     },
     "defaults": LAPTOP_CONFIGURATOR_DEFAULTS,

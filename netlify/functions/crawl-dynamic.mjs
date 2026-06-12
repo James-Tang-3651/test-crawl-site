@@ -201,7 +201,7 @@ function aboutPage(request) {
     <article>
       <p>Ceci est une page rendue cote serveur avec du contenu ordinaire et deux pages enfants.</p>
       <a href="/absolute">Enfant absolu</a>
-      <a href="/query-page?sort=price">Page de tri par requete</a>
+      <a href="/query-page/?sort=price">Page de tri par requete</a>
     </article>
     `;
     const headers = hasCookie(request, "site_language", "fr")
@@ -219,7 +219,7 @@ function aboutPage(request) {
     <article>
       <p>This is a server-rendered page with ordinary content and two child pages.</p>
       <a href="/absolute">Absolute child</a>
-      <a href="/query-page?sort=price">Query sort page</a>
+      <a href="/query-page/?sort=price">Query sort page</a>
     </article>
     `;
 
@@ -237,7 +237,7 @@ function localhostLink(url) {
     <ul>
       <li><a href="${localhostBase}/about">Localhost About link</a></li>
       <li><a href="${loopbackBase}/about">127.0.0.1 About link</a></li>
-      <li><a href="${localhostBase}/query-page?from=localhost-link">Localhost query link</a></li>
+      <li><a href="${localhostBase}/query-page/?from=localhost-link">Localhost query link</a></li>
     </ul>
     `;
 
@@ -248,7 +248,7 @@ async function slowPage() {
   await wait(2500);
   return htmlResponse(
     "Slow Page",
-    '<p>Slow page finished after a delay.</p><a href="/query-page?ref=slow">Query from slow page</a>',
+    '<p>Slow page finished after a delay.</p><a href="/query-page/?ref=slow">Query from slow page</a>',
   );
 }
 
@@ -500,6 +500,12 @@ async function vancouverWeeklyWeatherReport() {
 export default async function handler(request) {
   const url = new URL(request.url);
 
+  // Site links place a slash right before the query string (/path/?query),
+  // so treat /path/ and /path as the same route.
+  if (url.pathname.length > 1 && url.pathname.endsWith("/")) {
+    url.pathname = url.pathname.slice(0, -1);
+  }
+
   if (url.pathname === "/redirect-middle") {
     return Response.redirect(new URL("/redirect-target", url), 307);
   }
@@ -568,12 +574,17 @@ export const config = {
   path: [
     "/accept-consent",
     "/about",
+    "/about/",
     "/localhost-link",
+    "/localhost-link/",
     "/query-page",
+    "/query-page/",
     "/redirect-middle",
     "/slow",
+    "/slow/",
     "/status/504",
     "/transient-load",
+    "/transient-load/",
     "/transient-load/reset",
     "/transient-load/status",
     "/weather/vancouver-daily-report",

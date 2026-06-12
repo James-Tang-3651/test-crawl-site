@@ -108,7 +108,7 @@ these routes:
 - `/`
 - `/_manifest`
 - `/about`
-- `/query-page?sort=price`
+- `/query-page/?sort=price`
 - `/status/404`
 - `/status/429`
 - `/status/500`
@@ -119,7 +119,7 @@ these routes:
 - `/oversized-mime-type`
 - `/sitemap-exclusive-edge-case`
 - `/transient-load/reset?key=readme`
-- `/transient-load?key=readme`
+- `/transient-load/?key=readme`
 - `/files/sample.pdf`
 - `/files/sample.docx`
 - `/media/png-example.png`
@@ -134,7 +134,7 @@ crawler-facing behavior should match Netlify.
 - `/` root page with mixed links
 - `/_manifest` machine-readable page inventory
 - `/long-href` page with an href longer than 2048 characters
-- `/transient-load?key=<run-id>` page that returns 503 for five requests, then 200
+- `/transient-load/?key=<run-id>` page that returns 503 for five requests, then 200
 - `/transient-load/status?key=<run-id>` status endpoint for transient load tests
 - `/transient-load/reset?key=<run-id>` reset endpoint for transient load tests
 - `/oversized-title` char-limit page for title values longer than 1024 characters
