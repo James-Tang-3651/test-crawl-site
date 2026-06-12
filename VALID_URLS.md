@@ -8,7 +8,7 @@ Notes:
 - The manifest section lists unique crawl-worthy paths from `PAGE_MANIFEST`, including generated `/depth/*`, `/many/item/*`, and product variant pages.
 - The route-only section lists valid app endpoints that are not unique manifest content pages, including JSON endpoints, server-only fragments, redirect aliases, sitemap files, robots-blocked targets, and downloadable/media assets.
 - Status-code test endpoints such as `/status/404` are valid test routes even though they intentionally return non-2xx responses.
-- `/share-links` exposes external share-widget anchors (AddToAny/Facebook style) whose query string or fragment embeds a percent-encoded URL of this site's About page. The only valid discovered URLs there are the external share service URLs; `/about/?campaign_id=share-fragment`, `/about/?campaign_id=share-query`, and `/about/?campaign_id=share-double-encoded` must NOT appear in a crawl — their presence means the crawler decoded a URL embedded inside another URL.
+- `/share-links` exposes share-widget anchors (AddToAny/Facebook style) that point at `/weather/vancouver-daily-report` standing in for the share service, with a percent-encoded URL of this site's About page embedded in their query string or fragment. The valid discovered URLs there are the weather report URLs only; `/about/?campaign_id=share-fragment`, `/about/?campaign_id=share-query`, and `/about/?campaign_id=share-double-encoded` must NOT appear in a crawl — their presence means the crawler decoded a URL embedded inside another URL.
 
 ## Manifest URLs (213)
 
@@ -327,7 +327,7 @@ Notes:
 - `/_manifest`
 - `/fr/noodles`
 
-## Known Link Variants With Query, Fragment, or Absolute Host Form (98)
+## Known Link Variants With Query, Fragment, or Absolute Host Form (101)
 
 - `//{HOST}/protocol-relative-target`
 - `/about/?from=article-related-load`
@@ -426,4 +426,7 @@ Notes:
 - `/structured-content/list/basic/?from=markdown-reference`
 - `/structured-content/table/links/?from=sitemap-discovery-fail`
 - `/structured-content/?from=load-test`
+- `/weather/vancouver-daily-report#url=https%3A%2F%2F{HOST}%2Fabout%2F%3Fcampaign_id%3Dshare-fragment&title=About%20the%20noodle%20stand`
+- `/weather/vancouver-daily-report#url=https%253A%252F%252F{HOST}%252Fabout%252F%253Fcampaign_id%253Dshare-double-encoded&title=About%20the%20noodle%20stand`
+- `/weather/vancouver-daily-report/?u=https%3A%2F%2F{HOST}%2Fabout%2F%3Fcampaign_id%3Dshare-query`
 - `{BASE_URL}/absolute`
