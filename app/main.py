@@ -47,6 +47,41 @@ app = FastAPI(
 
 app.include_router(depth_router)
 
+# Routes that legitimately end with a slash (e.g. /docs/ for the base-tag test).
+# Computed lazily so every route registered below is included.
+_slash_route_paths: set = set()
+
+
+class ServeTrailingSlashUrls:
+    """Serve /path/?query=... directly instead of 307-redirecting to /path?query=...
+
+    Site links place a slash right before the query string, so the slashed form
+    must resolve to the same page without a redirect hop. Implemented as pure
+    ASGI middleware so the static export's single-shot ASGI calls keep working.
+    """
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http":
+            if not _slash_route_paths:
+                _slash_route_paths.update(
+                    route.path
+                    for route in app.routes
+                    if getattr(route, "path", "/").endswith("/")
+                )
+            path = scope.get("path", "")
+            if len(path) > 1 and path.endswith("/") and path not in _slash_route_paths:
+                scope = dict(scope)
+                scope["path"] = path[:-1]
+                scope["raw_path"] = path[:-1].encode("latin-1")
+        await self.app(scope, receive, send)
+
+
+app.add_middleware(ServeTrailingSlashUrls)
+
+
 APP_DIR = Path(__file__).resolve().parent
 
 _collector_log: deque = deque(maxlen=100)
@@ -138,7 +173,7 @@ LOAD_TEST_LOREM_PARAGRAPHS = [
     "Etiam ultrices, suspendisse in justo eu magna luctus suscipit. Sed lectus, integer euismod lacus luctus magna, quisque cursus metus vitae pharetra auctor.",
 ]
 LONG_HREF_PAYLOAD = "long-url-segment-" + ("a" * 2100)
-LONG_HREF_PATH = f"/long-href-target?{urlencode({'payload': LONG_HREF_PAYLOAD})}"
+LONG_HREF_PATH = f"/long-href-target/?{urlencode({'payload': LONG_HREF_PAYLOAD})}"
 TRANSIENT_LOAD_FAILURES = 5
 transient_load_counts: dict[str, int] = {}
 OVERSIZED_TITLE = "Oversized Title " + ("T" * 1100)
@@ -257,7 +292,7 @@ def repeated_nav() -> str:
 def item_links(limit: int) -> str:
     parts: List[str] = []
     for index in range(limit):
-        parts.append(f'<li><a href="/many/item/{index}?ref=list">Item {index}</a></li>')
+        parts.append(f'<li><a href="/many/item/{index}/?ref=list">Item {index}</a></li>')
     return "".join(parts)
 
 
@@ -282,9 +317,9 @@ def load_test_body() -> str:
     <p>This page is a large static load-test route with at least {LOAD_TEST_TARGET_BYTES} bytes of initial HTML.</p>
     <p>It repeats a 10-paragraph lorem ipsum block so the route stresses crawler download, HTML parsing, text extraction, and static export output size without relying on delayed JavaScript.</p>
     <nav>
-      <a href="/about?from=load-test">About reference</a>
-      <a href="/many-links?from=load-test">Many links reference</a>
-      <a href="/structured-content?from=load-test">Structured content reference</a>
+      <a href="/about/?from=load-test">About reference</a>
+      <a href="/many-links/?from=load-test">Many links reference</a>
+      <a href="/structured-content/?from=load-test">Structured content reference</a>
     </nav>
     """
     ]
@@ -1215,7 +1250,7 @@ def product_variant_matrix() -> str:
 
 
 def product_query_params_path(color_slug: str, size_slug: str) -> str:
-    return f"/product-pages/query-params?color={color_slug}&size={size_slug}"
+    return f"/product-pages/query-params/?color={color_slug}&size={size_slug}"
 
 
 def product_color_links_qp(selected_color: str, selected_size: str) -> str:
@@ -1310,9 +1345,9 @@ def product_common_sections(variant: dict) -> str:
     <section class="product-section">
       <h2>Related Accessories</h2>
       <ul>
-        <li><a href="/query-page?accessory=straw-lid">Straw lid accessory</a></li>
-        <li><a href="/query-page?accessory=cleaning-kit">Bottle cleaning kit</a></li>
-        <li><a href="/query-page?accessory=carry-sling">Trail carry sling</a></li>
+        <li><a href="/query-page/?accessory=straw-lid">Straw lid accessory</a></li>
+        <li><a href="/query-page/?accessory=cleaning-kit">Bottle cleaning kit</a></li>
+        <li><a href="/query-page/?accessory=carry-sling">Trail carry sling</a></li>
       </ul>
     </section>
     """
@@ -1377,7 +1412,7 @@ def french_about_page() -> HTMLResponse:
     <article>
       <p>Ceci est une page rendue cote serveur avec du contenu ordinaire et deux pages enfants.</p>
       <a href="/absolute">Enfant absolu</a>
-      <a href="/query-page?sort=price">Page de tri par requete</a>
+      <a href="/query-page/?sort=price">Page de tri par requete</a>
     </article>
     """
     return html_page("Page A Propos", body, head=head, lang="fr")
@@ -1667,7 +1702,7 @@ async def about(request: Request):
     <article>
       <p>This is a server-rendered page with ordinary content and two child pages.</p>
       <a href="/absolute">Absolute child</a>
-      <a href="/query-page?sort=price">Query sort page</a>
+      <a href="/query-page/?sort=price">Query sort page</a>
     </article>
     """
     return html_page("About Page", body, head=head, lang="en")
@@ -1796,8 +1831,8 @@ async def server_only_article_related_links():
     return HTMLResponse(
         """
         <ul>
-          <li><a href="/query-page?from=article-related-load-1">Related article query follow-up</a></li>
-          <li><a href="/about?from=article-related-load">Related article about follow-up</a></li>
+          <li><a href="/query-page/?from=article-related-load-1">Related article query follow-up</a></li>
+          <li><a href="/about/?from=article-related-load">Related article about follow-up</a></li>
         </ul>
         """
     )
@@ -1859,7 +1894,7 @@ async def redirect_target():
 @app.get("/slow", response_class=HTMLResponse)
 async def slow():
     await asyncio.sleep(2.5)
-    return html_page("Slow Page", '<p>Slow page finished after a delay.</p><a href="/query-page?ref=slow">Query from slow page</a>')
+    return html_page("Slow Page", '<p>Slow page finished after a delay.</p><a href="/query-page/?ref=slow">Query from slow page</a>')
 
 
 def transient_load_response(key: str):
@@ -1968,7 +2003,7 @@ async def consent(request: Request):
     if accepted:
         body = """
         <p>Consent cookie already present, so full content is visible.</p>
-        <a href="/query-page?consent=1">Consent-only child page</a>
+        <a href="/query-page/?consent=1">Consent-only child page</a>
         """
     else:
         body = """
@@ -2076,7 +2111,7 @@ async def server_only_load_more():
         """
         <article>
           <p>Server-only load more content: hand-pulled chili noodles are available after the hidden-DOM fetch.</p>
-          <a href="/many-links?from=server-load-more">Server load-more child link</a>
+          <a href="/many-links/?from=server-load-more">Server load-more child link</a>
         </article>
         """
     )
@@ -2096,7 +2131,7 @@ async def button_redirect():
       document.querySelector("#show-next").addEventListener("click", () => {
         const parts = ["button", "redirect", "target"];
         const builtPath = "/" + parts.join("-");
-        window.location.href = builtPath + "?from=button";
+        window.location.href = builtPath + "/?from=button";
       });
     </script>
     """
@@ -2108,7 +2143,7 @@ async def button_redirect_target():
     body = """
     <section>
       <p>Target page reached only after JavaScript builds the URL and redirects.</p>
-      <a href="/about?from=button-target">About child after button redirect</a>
+      <a href="/about/?from=button-target">About child after button redirect</a>
     </section>
     """
     return html_page("Button Redirect Target", body)
@@ -2124,7 +2159,7 @@ async def infinite():
         if (window.scrollY + window.innerHeight >= document.body.scrollHeight - 10) {
           appended = true;
           const div = document.createElement("div");
-          div.innerHTML = '<p>Infinite-scroll content appended.</p><a href="/many-links?from=infinite">Infinite child</a>';
+          div.innerHTML = '<p>Infinite-scroll content appended.</p><a href="/many-links/?from=infinite">Infinite child</a>';
           document.querySelector("main").appendChild(div);
         }
       });
@@ -2285,9 +2320,9 @@ async def product_javascript_calculated():
     <section class="product-section">
       <h2>Related Accessories</h2>
       <ul>
-        <li><a href="/query-page?accessory=straw-lid">Straw lid accessory</a></li>
-        <li><a href="/query-page?accessory=cleaning-kit">Bottle cleaning kit</a></li>
-        <li><a href="/query-page?accessory=carry-sling">Trail carry sling</a></li>
+        <li><a href="/query-page/?accessory=straw-lid">Straw lid accessory</a></li>
+        <li><a href="/query-page/?accessory=cleaning-kit">Bottle cleaning kit</a></li>
+        <li><a href="/query-page/?accessory=carry-sling">Trail carry sling</a></li>
       </ul>
     </section>
     """
@@ -2405,7 +2440,7 @@ def product_collection_grid_payload() -> dict:
             "color": "Gold",
             "type": "Backdrop Stand",
             "swatch": "#c9a227",
-            "href": "/query-page?product=gold-arch-8ft",
+            "href": "/query-page/?product=gold-arch-8ft",
         },
         {
             "id": "crystal-candelabra-47",
@@ -2417,7 +2452,7 @@ def product_collection_grid_payload() -> dict:
             "color": "Clear",
             "type": "Table Centerpiece",
             "swatch": "#dfefff",
-            "href": "/query-page?product=crystal-candelabra-47",
+            "href": "/query-page/?product=crystal-candelabra-47",
         },
         {
             "id": "clear-gold-charger-10",
@@ -2429,7 +2464,7 @@ def product_collection_grid_payload() -> dict:
             "color": "Clear",
             "type": "Dinnerware",
             "swatch": "#f8fbff",
-            "href": "/query-page?product=clear-gold-charger-10",
+            "href": "/query-page/?product=clear-gold-charger-10",
         },
         {
             "id": "white-chair-covers-10",
@@ -2441,7 +2476,7 @@ def product_collection_grid_payload() -> dict:
             "color": "White",
             "type": "Chair Covers",
             "swatch": "#ffffff",
-            "href": "/query-page?product=white-chair-covers-10",
+            "href": "/query-page/?product=white-chair-covers-10",
         },
         {
             "id": "white-scuba-tablecloth-120",
@@ -2453,7 +2488,7 @@ def product_collection_grid_payload() -> dict:
             "color": "White",
             "type": "Table Linens",
             "swatch": "#f3f3f3",
-            "href": "/query-page?product=white-scuba-tablecloth-120",
+            "href": "/query-page/?product=white-scuba-tablecloth-120",
         },
         {
             "id": "black-ruffle-chair-cover",
@@ -2465,7 +2500,7 @@ def product_collection_grid_payload() -> dict:
             "color": "Black",
             "type": "Chair Covers",
             "swatch": "#1d1d1d",
-            "href": "/query-page?product=black-ruffle-chair-cover",
+            "href": "/query-page/?product=black-ruffle-chair-cover",
         },
     ]
     return {
@@ -2981,9 +3016,9 @@ async def structured_content_list_basic():
     body = """
     <p>Basic menu lists with crawlable links inside list items.</p>
     <ul>
-      <li>Sesame noodles with chili crisp <a href="/query-page?dish=sesame&from=basic-list">View sesame details</a></li>
-      <li>Mushroom ramen with tofu <a href="/query-page?dish=mushroom&from=basic-list">View mushroom details</a></li>
-      <li>Cold soba with citrus sauce <a href="/about?from=basic-list">About the noodle stand</a></li>
+      <li>Sesame noodles with chili crisp <a href="/query-page/?dish=sesame&from=basic-list">View sesame details</a></li>
+      <li>Mushroom ramen with tofu <a href="/query-page/?dish=mushroom&from=basic-list">View mushroom details</a></li>
+      <li>Cold soba with citrus sauce <a href="/about/?from=basic-list">About the noodle stand</a></li>
     </ul>
     <ol>
       <li>Choose broth</li>
@@ -3002,15 +3037,15 @@ async def structured_content_list_nested():
       <li>
         Broth bowls
         <ul>
-          <li><a href="/query-page?category=shoyu&from=nested-list">Shoyu mushroom ramen</a></li>
-          <li><a href="/query-page?category=miso&from=nested-list">Miso corn ramen</a></li>
+          <li><a href="/query-page/?category=shoyu&from=nested-list">Shoyu mushroom ramen</a></li>
+          <li><a href="/query-page/?category=miso&from=nested-list">Miso corn ramen</a></li>
         </ul>
       </li>
       <li>
         Dry noodles
         <ul>
-          <li><a href="/query-page?category=sesame&from=nested-list">Sesame scallion noodles</a></li>
-          <li><a href="/query-page?category=chili&from=nested-list">Chili garlic knife-cut noodles</a></li>
+          <li><a href="/query-page/?category=sesame&from=nested-list">Sesame scallion noodles</a></li>
+          <li><a href="/query-page/?category=chili&from=nested-list">Chili garlic knife-cut noodles</a></li>
         </ul>
       </li>
     </ul>
@@ -3039,19 +3074,19 @@ async def structured_content_markdown_sample():
 
 This raw Markdown document is served as `text/markdown` for MIME type classification tests.
 
-It includes an [inline About link](/about?from=markdown-document) and an [inline query link](/query-page?topic=markdown&from=markdown-document).
+It includes an [inline About link](/about/?from=markdown-document) and an [inline query link](/query-page/?topic=markdown&from=markdown-document).
 
 ## List Links
 
-- [Basic list content](/structured-content/list/basic?from=markdown-document)
-- [Nested list content](/structured-content/list/nested?from=markdown-document)
+- [Basic list content](/structured-content/list/basic/?from=markdown-document)
+- [Nested list content](/structured-content/list/nested/?from=markdown-document)
 
 ## Reference Links
 
 Read the [table links page][table-links] or the [structured content hub][structured-hub].
 
-[table-links]: /structured-content/table/links?from=markdown-document
-[structured-hub]: /structured-content?from=markdown-document
+[table-links]: /structured-content/table/links/?from=markdown-document
+[structured-hub]: /structured-content/?from=markdown-document
 """
     return Response(content=content, media_type="text/markdown")
 
@@ -3060,9 +3095,9 @@ Read the [table links page][table-links] or the [structured content hub][structu
 async def structured_content_markdown_inline_links():
     body = """
     <article>
-      <p>This page mimics rendered Markdown with inline links such as <a href="/about?from=markdown-inline">About the noodle stand</a> and <a href="/query-page?topic=broth&from=markdown-inline">broth notes</a>.</p>
-      <pre>[About the noodle stand](/about?from=markdown-inline)
-[Broth notes](/query-page?topic=broth&amp;from=markdown-inline)</pre>
+      <p>This page mimics rendered Markdown with inline links such as <a href="/about/?from=markdown-inline">About the noodle stand</a> and <a href="/query-page/?topic=broth&from=markdown-inline">broth notes</a>.</p>
+      <pre>[About the noodle stand](/about/?from=markdown-inline)
+[Broth notes](/query-page/?topic=broth&amp;from=markdown-inline)</pre>
       <h2>Inline Link Notes</h2>
       <p>Inline links should be visible as ordinary anchors after Markdown rendering.</p>
     </article>
@@ -3074,9 +3109,9 @@ async def structured_content_markdown_inline_links():
 async def structured_content_markdown_reference_links():
     body = """
     <article>
-      <p>This page mimics rendered Markdown reference links for <a href="/query-page?topic=toppings&from=markdown-reference">topping notes</a> and <a href="/structured-content/list/basic?from=markdown-reference">basic list content</a>.</p>
-      <pre>[topping notes]: /query-page?topic=toppings&amp;from=markdown-reference
-[basic list content]: /structured-content/list/basic?from=markdown-reference</pre>
+      <p>This page mimics rendered Markdown reference links for <a href="/query-page/?topic=toppings&from=markdown-reference">topping notes</a> and <a href="/structured-content/list/basic/?from=markdown-reference">basic list content</a>.</p>
+      <pre>[topping notes]: /query-page/?topic=toppings&amp;from=markdown-reference
+[basic list content]: /structured-content/list/basic/?from=markdown-reference</pre>
       <h2>Reference Link Notes</h2>
       <p>Reference-style links should resolve into crawlable anchors after content rendering.</p>
     </article>
@@ -3212,7 +3247,7 @@ async def server_only_modal_popup():
         """
         <h2 id="modal-title">Server-only modal details</h2>
         <p>Server-only modal content: spicy garlic noodles are available after the popup fetch.</p>
-        <a href="/query-page?from=server-modal-popup">Server modal child link</a>
+        <a href="/query-page/?from=server-modal-popup">Server modal child link</a>
         <button id="close-modal" type="button">Close</button>
         """
     )
@@ -3314,7 +3349,7 @@ async def server_only_accordion_soup():
     return HTMLResponse(
         """
         <p>Server-only accordion soup content: clear broth noodles with ginger, scallion, and carrots.</p>
-        <a href="/query-page?dish=server-soup-noodles">Server soup noodle details</a>
+        <a href="/query-page/?dish=server-soup-noodles">Server soup noodle details</a>
         """
     )
 
@@ -3324,7 +3359,7 @@ async def server_only_accordion_dry():
     return HTMLResponse(
         """
         <p>Server-only accordion dry content: dry tossed noodles with sesame paste and pickled cucumber.</p>
-        <a href="/query-page?dish=server-dry-noodles">Server dry noodle details</a>
+        <a href="/query-page/?dish=server-dry-noodles">Server dry noodle details</a>
         """
     )
 
@@ -3459,7 +3494,7 @@ async def server_only_tabs_broth():
         """
         <h2>Server-only broth tab</h2>
         <p>Server-only broth tab content: light soy broth with roasted onion, ginger, garlic oil, and a long tasting note.</p>
-        <p><a href="/query-page?from=server-tab-broth">Server broth tab child link</a></p>
+        <p><a href="/query-page/?from=server-tab-broth">Server broth tab child link</a></p>
         """
     )
 
@@ -3470,7 +3505,7 @@ async def server_only_tabs_toppings():
         """
         <h2>Server-only toppings tab</h2>
         <p>Server-only toppings tab content: egg, corn, tofu, scallion, seaweed, pickled mushrooms, and crunchy garlic crumbs.</p>
-        <p><a href="/query-page?from=server-tab-toppings">Server toppings tab child link</a></p>
+        <p><a href="/query-page/?from=server-tab-toppings">Server toppings tab child link</a></p>
         """
     )
 
@@ -3481,7 +3516,7 @@ async def server_only_tabs_links():
         """
         <h2>Server-only links tab</h2>
         <p>Server-only links tab content: crawler-visible child appears only after tab selection.</p>
-        <p><a href="/query-page?from=server-tab-links">Server links tab child link</a></p>
+        <p><a href="/query-page/?from=server-tab-links">Server links tab child link</a></p>
         """
     )
 
@@ -3622,7 +3657,7 @@ async def carousel():
     <div class="carousel-track" aria-label="Noodle carousel">
       <section class="carousel-slide"><h2>Slide 1</h2><p>Hand-pulled noodles.</p></section>
       <section class="carousel-slide"><h2>Slide 2</h2><p>Tomato egg noodles.</p></section>
-      <section class="carousel-slide"><h2>Slide 3</h2><p><a href="/query-page?from=carousel">Carousel child link</a></p></section>
+      <section class="carousel-slide"><h2>Slide 3</h2><p><a href="/query-page/?from=carousel">Carousel child link</a></p></section>
     </div>
     """
     return html_page("Horizontal Carousel", body, head=head)
@@ -3669,7 +3704,7 @@ async def carousel_arrows():
       <div id="arrow-carousel-track" class="arrow-carousel-track" tabindex="0">
         <section class="arrow-carousel-slide"><h2>Slide 1</h2><p>Knife-cut chili noodles.</p></section>
         <section class="arrow-carousel-slide"><h2>Slide 2</h2><p>Mushroom udon with scallions.</p></section>
-        <section class="arrow-carousel-slide"><h2>Slide 3</h2><p><a href="/query-page?from=carousel-arrows">Arrow carousel child link</a></p></section>
+        <section class="arrow-carousel-slide"><h2>Slide 3</h2><p><a href="/query-page/?from=carousel-arrows">Arrow carousel child link</a></p></section>
         <section class="arrow-carousel-slide"><h2>Slide 4</h2><p>Cold sesame noodles with cucumber.</p></section>
       </div>
     </section>
@@ -3720,7 +3755,7 @@ async def chatbot_widget():
     <details id="local-chatbot-fallback" open>
       <summary>Comm100 local chat fallback</summary>
       <p>Hello! Need noodle recommendations or help testing crawler widget extraction?</p>
-      <a href="/query-page?from=chatbot-widget">Chat widget child link</a>
+      <a href="/query-page/?from=chatbot-widget">Chat widget child link</a>
     </details>
     """
     script = """<!--Begin Comm100 Live Chat Code-->
@@ -3747,7 +3782,7 @@ async def scroll_reveal():
         if (window.scrollY + window.innerHeight >= document.body.scrollHeight - 20) {
           revealed = true;
           document.querySelector("#scroll-reveal-result").innerHTML =
-            '<p>Scroll-triggered noodle content is now visible.</p><a href="/query-page?from=scroll-reveal">Scroll reveal child link</a>';
+            '<p>Scroll-triggered noodle content is now visible.</p><a href="/query-page/?from=scroll-reveal">Scroll reveal child link</a>';
         }
       });
     </script>
@@ -3820,13 +3855,13 @@ async def paywall_preview():
           <p>The third bowl was where the ranking changed. A quiet shoyu broth carried roasted corn, bamboo shoots, and a slow mushroom depth that made the louder chili bowls feel less certain.</p>
           <p>The fourth bowl leaned cold and sharp, with citrus dipping sauce and buckwheat noodles that held their bite even after a long pause for notes.</p>
           <p>The final bowl is intentionally faded behind the subscription panel, like a news or magazine article that shows the beginning before asking readers to subscribe.</p>
-          <a href="/query-page?from=paywall-preview">Faded article child link</a>
+          <a href="/query-page/?from=paywall-preview">Faded article child link</a>
         </section>
       </div>
       <section class="subscribe-block" aria-label="Subscription required">
         <h2>Keep reading</h2>
         <p>Subscribe to unlock the full noodle ranking, tasting notes, and final recommendation.</p>
-        <a href="/query-page?from=paywall-subscribe">Subscribe prompt link</a>
+        <a href="/query-page/?from=paywall-subscribe">Subscribe prompt link</a>
       </section>
     </article>
     """
@@ -3856,7 +3891,7 @@ async def blocking_popup():
     """
     body = """
     <p>Underlying page content about noodle specials.</p>
-    <a href="/query-page?from=blocking-popup">Underlying child link</a>
+    <a href="/query-page/?from=blocking-popup">Underlying child link</a>
     <div id="blocking-overlay" role="dialog" aria-modal="true">
       <div>
         <p>Blocking popup overlay: accept to see the noodle page.</p>
@@ -3883,8 +3918,8 @@ async def javascript_created_links():
     script = """
     <script>
       const links = [
-        { href: "/about?from=javascript-created", text: "JS created about link" },
-        { href: "/query-page?from=javascript-created", text: "JS created query link" }
+        { href: "/about/?from=javascript-created", text: "JS created about link" },
+        { href: "/query-page/?from=javascript-created", text: "JS created query link" }
       ];
       const target = document.querySelector("#dynamic-link-target");
       links.forEach((item) => {
@@ -3923,7 +3958,7 @@ async def depth_level_0():
 async def image_link():
     body = """
     <p>Image wrapped in an anchor that directs to a valid page.</p>
-    <a href="/about?from=image-link">
+    <a href="/about/?from=image-link">
       <img src="/media/shrek-rizz-face.jpg" alt="An Image of Shrek's face!" />
     </a>
     """
@@ -3956,21 +3991,21 @@ async def table_link():
           <td>Toasted sesame sauce with light soy</td>
           <td>Cucumber, scallion, crushed peanuts</td>
           <td>Mild</td>
-          <td><a href="/query-page?dish=sesame-scallion&from=table-cell">View sesame scallion details</a></td>
+          <td><a href="/query-page/?dish=sesame-scallion&from=table-cell">View sesame scallion details</a></td>
         </tr>
         <tr>
           <th scope="row">Mushroom Shoyu Ramen</th>
           <td>Slow mushroom shoyu broth</td>
           <td>Tofu, bamboo shoots, roasted corn</td>
           <td>Medium</td>
-          <td><a href="/about?from=table-cell">About this noodle stand</a></td>
+          <td><a href="/about/?from=table-cell">About this noodle stand</a></td>
         </tr>
         <tr>
           <th scope="row">Chili Garlic Knife-Cut Noodles</th>
           <td>Chili oil and black vinegar sauce</td>
           <td>Bok choy, garlic chips, soft egg</td>
           <td>Hot</td>
-          <td><a href="/query-page?dish=chili-garlic&from=table-cell">View chili garlic details</a></td>
+          <td><a href="/query-page/?dish=chili-garlic&from=table-cell">View chili garlic details</a></td>
         </tr>
       </tbody>
     </table>
@@ -4002,9 +4037,9 @@ async def sitemap_discovery_fail():
     body = """
     <p>This page advertises a sitemap that fails, but its normal page links remain valid.</p>
     <ul>
-      <li><a href="/about?from=sitemap-discovery-fail">Fallback About link</a></li>
-      <li><a href="/structured-content/table/links?from=sitemap-discovery-fail">Fallback table link</a></li>
-      <li><a href="/query-page?from=sitemap-discovery-fail">Fallback query link</a></li>
+      <li><a href="/about/?from=sitemap-discovery-fail">Fallback About link</a></li>
+      <li><a href="/structured-content/table/links/?from=sitemap-discovery-fail">Fallback table link</a></li>
+      <li><a href="/query-page/?from=sitemap-discovery-fail">Fallback query link</a></li>
     </ul>
     """
     return html_page("Sitemap Discovery Failure", body, head=head)
@@ -4051,7 +4086,7 @@ async def localhost_link(request: Request):
     <ul>
       <li><a href="{localhost_base}/about">Localhost About link</a></li>
       <li><a href="{loopback_base}/about">127.0.0.1 About link</a></li>
-      <li><a href="{localhost_base}/query-page?from=localhost-link">Localhost query link</a></li>
+      <li><a href="{localhost_base}/query-page/?from=localhost-link">Localhost query link</a></li>
     </ul>
     """
     return html_page("Localhost Links", body)
@@ -4120,7 +4155,7 @@ async def wrong_content_type_html_as_text():
   <body>
     <main>
       <p>This is valid HTML, but the HTTP Content-Type is text/plain.</p>
-      <a href="/about?from=html-as-text">HTML-as-text child link</a>
+      <a href="/about/?from=html-as-text">HTML-as-text child link</a>
     </main>
   </body>
 </html>"""
@@ -4133,7 +4168,7 @@ async def wrong_content_type_json_as_html():
         {
             "title": "Noodle payload",
             "description": "This body is JSON-shaped, but the HTTP Content-Type is text/html.",
-            "url": "/about?from=json-as-html",
+            "url": "/about/?from=json-as-html",
         },
         sort_keys=True,
     )
@@ -4144,27 +4179,16 @@ async def wrong_content_type_json_as_html():
 async def legacy_php():
     body = """
     <p>Legacy PHP-style path serving a normal HTML noodle page.</p>
-    <a href="/query-page?from=legacy-php">Legacy PHP child link</a>
+    <a href="/query-page/?from=legacy-php">Legacy PHP child link</a>
     """
     return html_page("Legacy PHP Page", body)
-
-
-@app.get("/robots.txt")
-async def robots_txt(request: Request):
-    base = str(request.base_url).rstrip("/")
-    content = f"""User-agent: *
-Disallow: /robots-blocked
-Disallow: /sitemap-invalid-404
-Sitemap: {base}/sitemap.xml
-"""
-    return PlainTextResponse(content)
 
 
 @app.get("/robots-blocked", response_class=HTMLResponse)
 async def robots_blocked():
     body = """
     <p>This valid noodle page is disallowed by robots.txt.</p>
-    <a href="/about?from=robots-blocked">Robots blocked child link</a>
+    <a href="/about/?from=robots-blocked">Robots blocked child link</a>
     """
     return html_page("Robots Blocked Page", body)
 
@@ -4517,13 +4541,13 @@ async def hash_query_combo(q: str = ""):
     query_display = escape(q) if q else "<em>No query entered.</em>"
     body = f"""
     <p>This page combines a query string with a hash fragment. The full URL looks like
-       <code>/hash-query-combo?q=test#results</code>. The <code>?q=</code> parameter is
+       <code>/hash-query-combo/?q=test#results</code>. The <code>?q=</code> parameter is
        processed server-side; the <code>#results</code> fragment scrolls the page to the
        results section. A crawler must parse <code>?</code> before <code>#</code> to correctly
        extract the query parameters — if it treats everything after <code>#</code> as the
        fragment, it will miss <code>?q=test</code>; if it treats <code>#results</code> as part
        of the query string, it will send a malformed request.</p>
-    <form action="/hash-query-combo" method="get">
+    <form action="/hash-query-combo/" method="get">
       <input name="q" value="{escape(q, quote=True)}" placeholder="Enter a search query" />
       <button type="submit">Search</button>
     </form>
@@ -4593,7 +4617,7 @@ async def percent_encoded_hash():
         as if it were a fragment delimiter would incorrectly record a 200 instead.
       </li>
       <li>
-        <a href="/query-page?ref=%23section">Query param with <code>%23</code>: <code>/query-page?ref=%23section</code></a> —
+        <a href="/query-page/?ref=%23section">Query param with <code>%23</code>: <code>/query-page/?ref=%23section</code></a> —
         the <code>%23</code> decodes to a literal <code>#</code> in the query value, not a fragment.
         The server receives <code>ref=#section</code> as a query parameter.
       </li>

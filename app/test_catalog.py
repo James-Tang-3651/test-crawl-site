@@ -95,9 +95,9 @@ TEST_SECTIONS: List[Dict[str, Any]] = [
                 "category": "query_variants",
                 "label": "Query variants",
                 "home_links": [
-                    {"href": "/query-page?{encoded_query}", "label": "Encoded query link"},
-                    {"href": "/query-page?ref=abc", "label": "Query variant A"},
-                    {"href": "/query-page?ref=xyz#frag", "label": "Query variant B"},
+                    {"href": "/query-page/?{encoded_query}", "label": "Encoded query link"},
+                    {"href": "/query-page/?ref=abc", "label": "Query variant A"},
+                    {"href": "/query-page/?ref=xyz#frag", "label": "Query variant B"},
                 ],
             },
             {
@@ -222,8 +222,8 @@ TEST_SECTIONS: List[Dict[str, Any]] = [
                 "label": "Query string + hash fragment combo page",
                 "home_links": [
                     {"href": "/hash-query-combo", "label": "Query string + hash fragment combo page"},
-                    {"href": "/hash-query-combo?q=test#results", "label": "Hash query combo - q=test"},
-                    {"href": "/hash-query-combo?q=other#results", "label": "Hash query combo - q=other"},
+                    {"href": "/hash-query-combo/?q=test#results", "label": "Hash query combo - q=test"},
+                    {"href": "/hash-query-combo/?q=other#results", "label": "Hash query combo - q=other"},
                 ],
             },
             {
@@ -592,7 +592,7 @@ TEST_SECTIONS: List[Dict[str, Any]] = [
                 "label": "Transient load failure then success",
                 "home_links": [
                     {
-                        "href": "/transient-load?key=homepage",
+                        "href": "/transient-load/?key=homepage",
                         "label": "Transient load failure then success",
                         "actions": [
                             {
@@ -806,7 +806,6 @@ TEST_SECTIONS: List[Dict[str, Any]] = [
                 "label": "Failing sitemap discovery page",
                 "home_links": [{"href": "/sitemap-discovery-fail", "label": "Failing sitemap discovery page"}],
             },
-            {"path": "/robots.txt", "crawl_worthy": True, "category": "robots_txt", "label": "Robots.txt"},
             {"path": "/sitemap.xml", "crawl_worthy": True, "category": "sitemap_xml", "label": "Sitemap XML"},
         ],
     },
@@ -1175,7 +1174,7 @@ def _product_variant_entries() -> Iterator[Dict[str, Any]]:
 def _product_variant_qp_entries() -> Iterator[Dict[str, Any]]:
     for variant in iter_product_variants():
         yield {
-            "path": f"/product-pages/query-params?color={variant['color_slug']}&size={variant['size_slug']}",
+            "path": f"/product-pages/query-params/?color={variant['color_slug']}&size={variant['size_slug']}",
             "crawl_worthy": True,
             "category": "product_variant_page",
             "product_variant_strategy": "query_params",
