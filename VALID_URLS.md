@@ -8,10 +8,11 @@ Notes:
 - The manifest section lists unique crawl-worthy paths from `PAGE_MANIFEST`, including generated `/depth/*`, `/many/item/*`, and product variant pages.
 - The route-only section lists valid app endpoints that are not unique manifest content pages, including JSON endpoints, server-only fragments, redirect aliases, sitemap files, robots-blocked targets, and downloadable/media assets.
 - Status-code test endpoints such as `/status/404` are valid test routes even though they intentionally return non-2xx responses.
+- `/share-links` exposes external share-widget anchors (AddToAny/Facebook style) whose query string or fragment embeds a percent-encoded URL of this site's About page. The only valid discovered URLs there are the external share service URLs; `/about/?campaign_id=share-fragment`, `/about/?campaign_id=share-query`, and `/about/?campaign_id=share-double-encoded` must NOT appear in a crawl — their presence means the crawler decoded a URL embedded inside another URL.
 
-## Manifest URLs (212)
+## Manifest URLs (213)
 
-### Core URL Handling (17)
+### Core URL Handling (18)
 
 - `/` - Root page
 - `/about` - Relative About
@@ -27,6 +28,7 @@ Notes:
 - `/docs/child-from-base` - Base tag child page
 - `/query-page` - Query variants
 - `/localhost-link` - Localhost absolute links
+- `/share-links` - Share widget links with embedded encoded URLs
 - `/long-href` - Long href over 2048 characters
 - `/long-href-target` - Long href target
 - `/legacy.php` - Legacy PHP-style page
