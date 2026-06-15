@@ -4800,54 +4800,53 @@ async def shrek_rizz_face_jpg():
     return FileResponse(APP_DIR / "images" / "shrek rizz face.jpg", media_type="image/jpeg")
 
 
-@app.get("/images/with-extension", response_class=HTMLResponse)
-async def images_with_extension():
-    body = """
-    <p>Images served at URLs that include the file extension.</p>
-    <img src="/media/pixel.jpg" alt="JPEG" />
-    <img src="/media/png-example.png" alt="PNG" />
-    <img src="/media/gif-example.gif" alt="GIF" />
-    <img src="/media/webpfile.webp" alt="WebP" />
-    <img src="/media/bank-card-svgrepo-com.svg" alt="SVG" />
-    """
-    return html_page("Images With Extension", body)
-
-
-@app.get("/images/no-extension", response_class=HTMLResponse)
-async def images_no_extension():
-    body = """
-    <p>Images served at URLs with no file extension. Content-Type header identifies the format.</p>
-    <img src="/media/jpeg-image" alt="JPEG (no extension)" />
-    <img src="/media/png-image" alt="PNG (no extension)" />
-    <img src="/media/gif-image" alt="GIF (no extension)" />
-    <img src="/media/webp-image" alt="WebP (no extension)" />
-    <img src="/media/svg-image" alt="SVG (no extension)" />
-    """
-    return html_page("Images Without Extension", body)
-
-
-@app.get("/media/jpeg-image")
-async def jpeg_image_no_ext():
+@app.get("/images-with-extension/pixel.jpg")
+async def ext_jpeg():
     return Response(content=MINIMAL_JPG, media_type="image/jpeg")
 
 
-@app.get("/media/png-image")
-async def png_image_no_ext():
+@app.get("/images-with-extension/png-example.png")
+async def ext_png():
     return FileResponse(APP_DIR / "images" / "png example.png", media_type="image/png")
 
 
-@app.get("/media/gif-image")
-async def gif_image_no_ext():
+@app.get("/images-with-extension/gif-example.gif")
+async def ext_gif():
     return FileResponse(APP_DIR / "images" / "gif example.gif", media_type="image/gif")
 
 
-@app.get("/media/webp-image")
-async def webp_image_no_ext():
+@app.get("/images-with-extension/webpfile.webp")
+async def ext_webp():
     return FileResponse(APP_DIR / "images" / "webpfile.webp", media_type="image/webp")
 
 
-@app.get("/media/svg-image")
-async def svg_image_no_ext():
+@app.get("/images-with-extension/svg-example.svg")
+async def ext_svg():
+    return FileResponse(APP_DIR / "images" / "bank-card-svgrepo-com.svg", media_type="image/svg+xml")
+
+
+@app.get("/images-without-extension/jpeg-image")
+async def no_ext_jpeg():
+    return Response(content=MINIMAL_JPG, media_type="image/jpeg")
+
+
+@app.get("/images-without-extension/png-image")
+async def no_ext_png():
+    return FileResponse(APP_DIR / "images" / "png example.png", media_type="image/png")
+
+
+@app.get("/images-without-extension/gif-image")
+async def no_ext_gif():
+    return FileResponse(APP_DIR / "images" / "gif example.gif", media_type="image/gif")
+
+
+@app.get("/images-without-extension/webp-image")
+async def no_ext_webp():
+    return FileResponse(APP_DIR / "images" / "webpfile.webp", media_type="image/webp")
+
+
+@app.get("/images-without-extension/svg-image")
+async def no_ext_svg():
     return FileResponse(APP_DIR / "images" / "bank-card-svgrepo-com.svg", media_type="image/svg+xml")
 
 
