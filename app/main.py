@@ -183,6 +183,23 @@ OVERSIZED_MIME_TYPE = "application/" + ("vnd.crawltest." * 22) + "html"
 OVERSIZED_CHARSET = "utf-" + ("crawltest-" * 32) + "8"
 
 VANCOUVER_TZ = ZoneInfo("America/Vancouver")
+
+ENUM_SYNC_STATES = ["queued", "syncing", "finalizing", "synced"]
+
+
+def enum_sync_current(now: datetime) -> dict:
+    """Time-based enum that advances once per minute and cycles every 4 minutes."""
+    minutes = now.hour * 60 + now.minute
+    idx = minutes % len(ENUM_SYNC_STATES)
+    return {
+        "status": ENUM_SYNC_STATES[idx],
+        "states": ENUM_SYNC_STATES,
+        "server_time": now.isoformat(timespec="seconds"),
+        "next_status": ENUM_SYNC_STATES[(idx + 1) % len(ENUM_SYNC_STATES)],
+        "seconds_to_next": 60 - now.second,
+    }
+
+
 DEFAULT_WEATHER_CITY = "vancouver"
 WEATHER_LOCATIONS = {
     "vancouver": {"name": "Vancouver, BC", "sentence_name": "Vancouver BC"},
@@ -4151,6 +4168,22 @@ async def weather_vancouver_weekly_report():
         "Vancouver weekly weather report",
         vancouver_weekly_weather_body(),
     )
+
+
+@app.get("/enum-sync", response_class=HTMLResponse)
+async def enum_sync():
+    state = enum_sync_current(datetime.now(VANCOUVER_TZ))
+    options = " | ".join(state["states"])
+    body = f"""
+    <p>Sync status reported from a fixed enum. The value advances every minute,
+       so a value captured during a crawl will differ from the value seen when a
+       later step finalizes it.</p>
+    <p>Current status: <strong id="enum-sync-status">{escape(state["status"])}</strong></p>
+    <p>Valid states: {escape(options)}</p>
+    <p>Next status: {escape(state["next_status"])} (in {state["seconds_to_next"]}s)</p>
+    <p>Server time: {escape(state["server_time"])}</p>
+    """
+    return html_page("Enum Sync Status", body)
 
 
 @app.get("/localhost-link", response_class=HTMLResponse)

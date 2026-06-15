@@ -88,6 +88,7 @@ FUNCTION_PATHS = {
     "/transient-load",
     "/transient-load/reset",
     "/transient-load/status",
+    "/enum-sync",
     "/weather/vancouver-daily-report",
     "/weather/vancouver-daily-report/data.json",
     "/weather/vancouver-weekly-report",

@@ -80,6 +80,41 @@ function vancouverToday() {
   return `${values.month}/${values.day}/${values.year}`;
 }
 
+const enumSyncStates = ["queued", "syncing", "finalizing", "synced"];
+
+function vancouverClockParts() {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+    timeZone: "America/Vancouver",
+  }).formatToParts(new Date());
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  let hour = Number(values.hour);
+  if (hour === 24) {
+    hour = 0; // some runtimes render midnight as "24"
+  }
+  return {hour, minute: Number(values.minute), second: Number(values.second)};
+}
+
+function enumSyncPage() {
+  const {hour, minute, second} = vancouverClockParts();
+  const idx = (hour * 60 + minute) % enumSyncStates.length;
+  const status = enumSyncStates[idx];
+  const nextStatus = enumSyncStates[(idx + 1) % enumSyncStates.length];
+  const secondsToNext = 60 - second;
+  const body = `
+    <p>Sync status reported from a fixed enum. The value advances every minute,
+       so a value captured during a crawl will differ from the value seen when a
+       later step finalizes it.</p>
+    <p>Current status: <strong id="enum-sync-status">${escapeHtml(status)}</strong></p>
+    <p>Valid states: ${escapeHtml(enumSyncStates.join(" | "))}</p>
+    <p>Next status: ${escapeHtml(nextStatus)} (in ${secondsToNext}s)</p>
+  `;
+  return htmlResponse("Enum Sync Status", body);
+}
+
 function weatherImageKind(summary) {
   const normalized = summary.toLowerCase();
   if (["rain", "shower", "drizzle"].some((term) => normalized.includes(term))) {
@@ -653,6 +688,10 @@ export default async function handler(request) {
     return vancouverWeeklyWeatherReport();
   }
 
+  if (url.pathname === "/enum-sync") {
+    return enumSyncPage();
+  }
+
   return new Response("Not found", {
     status: 404,
     headers: {"content-type": "text/plain; charset=utf-8"},
@@ -683,5 +722,6 @@ export const config = {
     "/weather/vancouver-daily-report/",
     "/weather/vancouver-daily-report/data.json",
     "/weather/vancouver-weekly-report",
+    "/enum-sync",
   ],
 };

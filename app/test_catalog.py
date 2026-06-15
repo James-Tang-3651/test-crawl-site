@@ -347,6 +347,14 @@ TEST_SECTIONS: List[Dict[str, Any]] = [
                 "home_links": [{"href": "/client", "label": "Client-rendered page"}],
             },
             {
+                "path": "/enum-sync",
+                "crawl_worthy": True,
+                "category": "enum_sync_timebased",
+                "dynamic_content_generated": True,
+                "label": "Enum sync status (time-based, advances each minute)",
+                "home_links": [{"href": "/enum-sync", "label": "Enum sync status (changes every minute)"}],
+            },
+            {
                 "path": "/delayed",
                 "crawl_worthy": True,
                 "category": "delayed_async",
