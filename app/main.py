@@ -2240,15 +2240,15 @@ SLASH_QUERY_CANONICAL_BODY = """
     """
 
 # Simulates WP Rocket cached output: CSS inlined, JS deferred via data-rocket-src.
+# Canonical tag deliberately omitted: testing whether the crawler collapses query
+# variants onto the no-query canonical URL.
 SLASH_QUERY_HEAD_CACHED = """
-    <link rel="canonical" href="/slash-query-canonical/" />
     <style id="wpr-usedcss">body{margin:0;font-family:sans-serif}/* cache-optimized inline CSS */</style>
     <script data-rocket-src="/static/vendor.js" type="rocketlazyloadscript"></script>
     <script data-rocket-src="/static/app.js" type="rocketlazyloadscript"></script>"""
 
 # Simulates raw WordPress output: external CSS/JS loaded normally, cache bypassed by query string.
 SLASH_QUERY_HEAD_RAW = """
-    <link rel="canonical" href="/slash-query-canonical/" />
     <link rel="dns-prefetch" href="//fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" id="vendor-css" href="/static/vendor.css" />
@@ -4798,6 +4798,31 @@ async def svg_example():
 @app.get("/media/shrek-rizz-face.jpg")
 async def shrek_rizz_face_jpg():
     return FileResponse(APP_DIR / "images" / "shrek rizz face.jpg", media_type="image/jpeg")
+
+
+@app.get("/media/jpeg-image")
+async def jpeg_image_no_ext():
+    return Response(content=MINIMAL_JPG, media_type="image/jpeg")
+
+
+@app.get("/media/png-image")
+async def png_image_no_ext():
+    return FileResponse(APP_DIR / "images" / "png example.png", media_type="image/png")
+
+
+@app.get("/media/gif-image")
+async def gif_image_no_ext():
+    return FileResponse(APP_DIR / "images" / "gif example.gif", media_type="image/gif")
+
+
+@app.get("/media/webp-image")
+async def webp_image_no_ext():
+    return FileResponse(APP_DIR / "images" / "webpfile.webp", media_type="image/webp")
+
+
+@app.get("/media/svg-image")
+async def svg_image_no_ext():
+    return FileResponse(APP_DIR / "images" / "bank-card-svgrepo-com.svg", media_type="image/svg+xml")
 
 
 @app.get("/download/sample.zip")

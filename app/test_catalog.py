@@ -821,6 +821,36 @@ TEST_SECTIONS: List[Dict[str, Any]] = [
                 "home_links": [{"href": "/media/bank-card-svgrepo-com.svg", "label": "SVG image file"}],
             },
             {
+                "category": "image_jpeg_no_ext_asset",
+                "include_in_manifest": False,
+                "label": "JPEG image (no URL extension)",
+                "home_links": [{"href": "/media/jpeg-image", "label": "JPEG image (no URL extension)"}],
+            },
+            {
+                "category": "image_png_no_ext_asset",
+                "include_in_manifest": False,
+                "label": "PNG image (no URL extension)",
+                "home_links": [{"href": "/media/png-image", "label": "PNG image (no URL extension)"}],
+            },
+            {
+                "category": "image_gif_no_ext_asset",
+                "include_in_manifest": False,
+                "label": "GIF image (no URL extension)",
+                "home_links": [{"href": "/media/gif-image", "label": "GIF image (no URL extension)"}],
+            },
+            {
+                "category": "image_webp_no_ext_asset",
+                "include_in_manifest": False,
+                "label": "WebP image (no URL extension)",
+                "home_links": [{"href": "/media/webp-image", "label": "WebP image (no URL extension)"}],
+            },
+            {
+                "category": "image_svg_no_ext_asset",
+                "include_in_manifest": False,
+                "label": "SVG image (no URL extension)",
+                "home_links": [{"href": "/media/svg-image", "label": "SVG image (no URL extension)"}],
+            },
+            {
                 "category": "zip_asset",
                 "include_in_manifest": False,
                 "label": "ZIP file",
