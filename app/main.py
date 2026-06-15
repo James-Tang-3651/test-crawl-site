@@ -4804,11 +4804,13 @@ async def shrek_rizz_face_jpg():
 async def images_with_extension_page():
     body = """
     <p>Images served at URLs that include the file extension.</p>
-    <img src="/images-with-extension/pixel.jpg" alt="JPEG" />
-    <img src="/images-with-extension/png-example.png" alt="PNG" />
-    <img src="/images-with-extension/gif-example.gif" alt="GIF" />
-    <img src="/images-with-extension/webpfile.webp" alt="WebP" />
-    <img src="/images-with-extension/svg-example.svg" alt="SVG" />
+    <ul>
+      <li><a href="/images-with-extension/pixel.jpg">JPEG image (with extension)</a></li>
+      <li><a href="/images-with-extension/png-example.png">PNG image (with extension)</a></li>
+      <li><a href="/images-with-extension/gif-example.gif">GIF image (with extension)</a></li>
+      <li><a href="/images-with-extension/webpfile.webp">WebP image (with extension)</a></li>
+      <li><a href="/images-with-extension/svg-example.svg">SVG image (with extension)</a></li>
+    </ul>
     """
     return html_page("Images With Extension", body)
 
@@ -4817,11 +4819,13 @@ async def images_with_extension_page():
 async def images_without_extension_page():
     body = """
     <p>Images served at URLs with no file extension. Content-Type header identifies the format.</p>
-    <img src="/images-without-extension/jpeg-image" alt="JPEG (no extension)" />
-    <img src="/images-without-extension/png-image" alt="PNG (no extension)" />
-    <img src="/images-without-extension/gif-image" alt="GIF (no extension)" />
-    <img src="/images-without-extension/webp-image" alt="WebP (no extension)" />
-    <img src="/images-without-extension/svg-image" alt="SVG (no extension)" />
+    <ul>
+      <li><a href="/images-without-extension/jpeg-image">JPEG image (no URL extension)</a></li>
+      <li><a href="/images-without-extension/png-image">PNG image (no URL extension)</a></li>
+      <li><a href="/images-without-extension/gif-image">GIF image (no URL extension)</a></li>
+      <li><a href="/images-without-extension/webp-image">WebP image (no URL extension)</a></li>
+      <li><a href="/images-without-extension/svg-image">SVG image (no URL extension)</a></li>
+    </ul>
     """
     return html_page("Images Without Extension", body)
 

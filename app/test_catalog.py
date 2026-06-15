@@ -804,7 +804,7 @@ TEST_SECTIONS: List[Dict[str, Any]] = [
                 "label": "Images without extension",
                 "home_links": [{"href": "/images-without-extension", "label": "Images without extension"}],
             },
-            {"category": "image_asset", "include_in_manifest": False, "label": "JPEG image (with extension)"},
+{"category": "image_asset", "include_in_manifest": False, "label": "JPEG image (with extension)"},
             {"category": "image_png_asset", "include_in_manifest": False, "label": "PNG image (with extension)"},
             {"category": "image_gif_asset", "include_in_manifest": False, "label": "GIF image (with extension)"},
             {"category": "image_webp_asset", "include_in_manifest": False, "label": "WebP image (with extension)"},
