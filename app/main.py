@@ -4800,6 +4800,32 @@ async def shrek_rizz_face_jpg():
     return FileResponse(APP_DIR / "images" / "shrek rizz face.jpg", media_type="image/jpeg")
 
 
+@app.get("/images-with-extension", response_class=HTMLResponse)
+async def images_with_extension_page():
+    body = """
+    <p>Images served at URLs that include the file extension.</p>
+    <img src="/images-with-extension/pixel.jpg" alt="JPEG" />
+    <img src="/images-with-extension/png-example.png" alt="PNG" />
+    <img src="/images-with-extension/gif-example.gif" alt="GIF" />
+    <img src="/images-with-extension/webpfile.webp" alt="WebP" />
+    <img src="/images-with-extension/svg-example.svg" alt="SVG" />
+    """
+    return html_page("Images With Extension", body)
+
+
+@app.get("/images-without-extension", response_class=HTMLResponse)
+async def images_without_extension_page():
+    body = """
+    <p>Images served at URLs with no file extension. Content-Type header identifies the format.</p>
+    <img src="/images-without-extension/jpeg-image" alt="JPEG (no extension)" />
+    <img src="/images-without-extension/png-image" alt="PNG (no extension)" />
+    <img src="/images-without-extension/gif-image" alt="GIF (no extension)" />
+    <img src="/images-without-extension/webp-image" alt="WebP (no extension)" />
+    <img src="/images-without-extension/svg-image" alt="SVG (no extension)" />
+    """
+    return html_page("Images Without Extension", body)
+
+
 @app.get("/images-with-extension/pixel.jpg")
 async def ext_jpeg():
     return Response(content=MINIMAL_JPG, media_type="image/jpeg")
