@@ -4800,6 +4800,31 @@ async def shrek_rizz_face_jpg():
     return FileResponse(APP_DIR / "images" / "shrek rizz face.jpg", media_type="image/jpeg")
 
 
+@app.get("/media/jpeg-image")
+async def jpeg_image_no_ext():
+    return Response(content=MINIMAL_JPG, media_type="image/jpeg")
+
+
+@app.get("/media/png-image")
+async def png_image_no_ext():
+    return FileResponse(APP_DIR / "images" / "png example.png", media_type="image/png")
+
+
+@app.get("/media/gif-image")
+async def gif_image_no_ext():
+    return FileResponse(APP_DIR / "images" / "gif example.gif", media_type="image/gif")
+
+
+@app.get("/media/webp-image")
+async def webp_image_no_ext():
+    return FileResponse(APP_DIR / "images" / "webpfile.webp", media_type="image/webp")
+
+
+@app.get("/media/svg-image")
+async def svg_image_no_ext():
+    return FileResponse(APP_DIR / "images" / "bank-card-svgrepo-com.svg", media_type="image/svg+xml")
+
+
 @app.get("/download/sample.zip")
 async def sample_zip():
     return Response(content=MINIMAL_ZIP, media_type="application/zip")
