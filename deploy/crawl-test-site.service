@@ -1,0 +1,25 @@
+[Unit]
+Description=Crawl Test Site (FastAPI/uvicorn) - Render-equivalent live app
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=crawl
+Group=crawl
+WorkingDirectory=/opt/crawl-test-site
+# Single worker is intentional: several test pages keep in-process state
+# (/transient-load, /intermittent-error, /editable). Multiple workers would each
+# hold their own copy and answer inconsistently. /enum-sync is time-based and
+# stateless, so it is unaffected either way.
+ExecStart=/opt/crawl-test-site/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 9000 --workers 1
+Restart=on-failure
+RestartSec=3
+
+# Light hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+
+[Install]
+WantedBy=multi-user.target
