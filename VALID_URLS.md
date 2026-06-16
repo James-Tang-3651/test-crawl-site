@@ -124,7 +124,6 @@ Notes:
 ### Scale and Graph Shape (108)
 
 - `/many-links` - Many links page
-- `/load-test` - Large static load-test page
 - `/self-reference-direct` - Direct self-reference page
 - `/self-reference-cycle-a` - Two-page self-reference cycle
 - `/self-reference-cycle-b` - Self-reference cycle B
@@ -344,13 +343,11 @@ Notes:
 - `/about/?from=html-as-text`
 - `/about/?from=image-link`
 - `/about/?from=javascript-created`
-- `/about/?from=load-test`
 - `/about/?from=markdown-inline`
 - `/about/?from=robots-blocked`
 - `/about/?from=sitemap-discovery-fail`
 - `/about/?from=table-cell`
 - `/many-links/?from=infinite`
-- `/many-links/?from=load-test`
 - `/many-links/?from=server-load-more`
 - `/many/item/0/?ref=list`
 - `/many/item/10/?ref=list`
@@ -438,7 +435,6 @@ Notes:
 - `/slash-query-canonical?campaign_id=resources-bottom`
 - `/structured-content/list/basic/?from=markdown-reference`
 - `/structured-content/table/links/?from=sitemap-discovery-fail`
-- `/structured-content/?from=load-test`
 - `/weather/vancouver-daily-report#url=https%3A%2F%2F{HOST}%2Fabout%2F%3Fcampaign_id%3Dshare-fragment&title=About%20the%20noodle%20stand`
 - `/weather/vancouver-daily-report#url=https%253A%252F%252F{HOST}%252Fabout%252F%253Fcampaign_id%253Dshare-double-encoded&title=About%20the%20noodle%20stand`
 - `/weather/vancouver-daily-report/?u=https%3A%2F%2F{HOST}%2Fabout%2F%3Fcampaign_id%3Dshare-query`

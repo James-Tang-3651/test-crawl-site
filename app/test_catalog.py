@@ -933,15 +933,6 @@ TEST_SECTIONS: List[Dict[str, Any]] = [
                 "home_links": [{"href": "/many-links", "label": "Many links page"}],
             },
             {
-                "path": "/load-test",
-                "crawl_worthy": True,
-                "category": "large_static_payload",
-                "target_payload_bytes": 7_500_000,
-                "target_payload_label": "7.5 MB",
-                "label": "Large static load-test page",
-                "home_links": [{"href": "/load-test", "label": "Large static load-test page"}],
-            },
-            {
                 "path": "/self-reference-direct",
                 "crawl_worthy": True,
                 "category": "self_reference_direct",
