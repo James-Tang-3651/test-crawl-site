@@ -158,20 +158,6 @@ MINIMAL_JPG = bytes.fromhex(
 
 MINIMAL_ZIP = bytes.fromhex("504b03041400000000000000000000000000000000000000000000")
 MINIMAL_DOCX = minimal_docx_bytes()
-LOAD_TEST_TARGET_BYTES = 7_500_000
-LOAD_TEST_TITLE = "Large Static Load-Test Page"
-LOAD_TEST_LOREM_PARAGRAPHS = [
-    "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed non risus vitae magna aliquet facilisis. Integer nec odio, praesent libero, sed cursus ante dapibus diam.",
-    "Sed nisi nulla, quis sem at nibh elementum imperdiet. Duis sagittis ipsum, praesent mauris, fusce nec tellus sed augue semper porta.",
-    "Mauris massa, vestibulum lacinia arcu eget, nulla class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos.",
-    "Curabitur sodales ligula in libero. Sed dignissim lacinia nunc, curabitur tortor, pellentesque nibh, aenean quam, in scelerisque sem at dolor.",
-    "Maecenas mattis, sed convallis tristique sem. Proin ut ligula vel nunc egestas porttitor, morbi lectus risus, iaculis vel suscipit quis, luctus non massa.",
-    "Fusce ac turpis quis ligula lacinia aliquet. Mauris ipsum, nulla metus metus, ullamcorper vel tincidunt sed, euismod in nibh.",
-    "Quisque volutpat condimentum velit. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos.",
-    "Nam nec ante. Sed lacinia, urna non tincidunt mattis, tortor neque adipiscing diam, a cursus ipsum ante quis turpis.",
-    "Nulla facilisi. Ut fringilla, suspendisse potenti, nunc feugiat mi a tellus consequat imperdiet, vestibulum sapien proin quam.",
-    "Etiam ultrices, suspendisse in justo eu magna luctus suscipit. Sed lectus, integer euismod lacus luctus magna, quisque cursus metus vitae pharetra auctor.",
-]
 LONG_HREF_PAYLOAD = "long-url-segment-" + ("a" * 2100)
 LONG_HREF_PATH = f"/long-href-target/?{urlencode({'payload': LONG_HREF_PAYLOAD})}"
 TRANSIENT_LOAD_FAILURES = 5
@@ -313,43 +299,6 @@ def item_links(limit: int) -> str:
     for index in range(limit):
         parts.append(f'<li><a href="/many/item/{index}/?ref=list">Item {index}</a></li>')
     return "".join(parts)
-
-
-def load_test_section(index: int) -> str:
-    marker = f"{index:05d}"
-    paragraphs = "\n".join(
-        f'      <p data-paragraph="{paragraph_index:02d}">{escape(text)}</p>'
-        for paragraph_index, text in enumerate(LOAD_TEST_LOREM_PARAGRAPHS, start=1)
-    )
-    return f"""
-    <article class="load-test-section" id="load-section-{marker}">
-      <h2>Lorem Ipsum Block {marker}</h2>
-{paragraphs}
-    </article>
-    """
-
-
-@lru_cache(maxsize=1)
-def load_test_body() -> str:
-    parts: List[str] = [
-        f"""
-    <p>This page is a large static load-test route with at least {LOAD_TEST_TARGET_BYTES} bytes of initial HTML.</p>
-    <p>It repeats a 10-paragraph lorem ipsum block so the route stresses crawler download, HTML parsing, text extraction, and static export output size without relying on delayed JavaScript.</p>
-    <nav>
-      <a href="/about/?from=load-test">About reference</a>
-      <a href="/many-links/?from=load-test">Many links reference</a>
-      <a href="/structured-content/?from=load-test">Structured content reference</a>
-    </nav>
-    """
-    ]
-    section_index = 0
-    while True:
-        parts.append(load_test_section(section_index))
-        if section_index % 10 == 0:
-            body = "".join(parts)
-            if len(html_document(LOAD_TEST_TITLE, body).encode("utf-8")) >= LOAD_TEST_TARGET_BYTES:
-                return body
-        section_index += 1
 
 
 def vancouver_today() -> str:
@@ -3004,11 +2953,6 @@ async def many_links():
     <ul>{item_links(40)}</ul>
     """
     return html_page("Many Links", body)
-
-
-@app.get("/load-test", response_class=HTMLResponse)
-async def load_test():
-    return html_page(LOAD_TEST_TITLE, load_test_body())
 
 
 @app.get("/many/item/{item_id}", response_class=HTMLResponse)

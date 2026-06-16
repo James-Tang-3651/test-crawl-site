@@ -501,6 +501,7 @@ TEST_SECTIONS: List[Dict[str, Any]] = [
                 "path": "/editable",
                 "crawl_worthy": True,
                 "category": "editable_page",
+                "sitemap_changefreq": "daily",
                 "label": "Inline-editable PUT page",
                 "home_links": [{"href": "/editable", "label": "Editable Page (PUT)"}],
             },
@@ -930,15 +931,6 @@ TEST_SECTIONS: List[Dict[str, Any]] = [
                 "category": "large_link_set",
                 "label": "Many links page",
                 "home_links": [{"href": "/many-links", "label": "Many links page"}],
-            },
-            {
-                "path": "/load-test",
-                "crawl_worthy": True,
-                "category": "large_static_payload",
-                "target_payload_bytes": 7_500_000,
-                "target_payload_label": "7.5 MB",
-                "label": "Large static load-test page",
-                "home_links": [{"href": "/load-test", "label": "Large static load-test page"}],
             },
             {
                 "path": "/self-reference-direct",
