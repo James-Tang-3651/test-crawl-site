@@ -501,6 +501,7 @@ TEST_SECTIONS: List[Dict[str, Any]] = [
                 "path": "/editable",
                 "crawl_worthy": True,
                 "category": "editable_page",
+                "sitemap_changefreq": "daily",
                 "label": "Inline-editable PUT page",
                 "home_links": [{"href": "/editable", "label": "Editable Page (PUT)"}],
             },
